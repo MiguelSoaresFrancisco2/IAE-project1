@@ -57,6 +57,33 @@ def plot_training_history(
         plt.show()
 
 
+def plot_mmr_tradeoff(
+    config: Config,
+    mmr_summary_df: pd.DataFrame,
+    method_name: str,
+) -> None:
+    plt.figure(figsize=(8, 5))
+    plt.plot(mmr_summary_df["diversity@10"], mmr_summary_df["ndcg@10"], marker="o")
+
+    for _, row in mmr_summary_df.iterrows():
+        plt.annotate(
+            f"α={row['alpha']}",
+            (row["diversity@10"], row["ndcg@10"]),
+            textcoords="offset points",
+            xytext=(5, 5),
+        )
+
+    plt.xlabel("Diversity@10")
+    plt.ylabel("NDCG@10")
+    plt.title(f"MMR Tradeoff on {method_name.upper()}: NDCG@10 vs Diversity@10")
+    plt.grid(True)
+    if config.SAVE_IMAGES:
+        os.makedirs("images", exist_ok=True)
+        plt.savefig(f"images/mmr_tradeoff_{method_name}.png")
+    if config.SHOW_PLOTS:
+        plt.show()
+
+
 def compare_methods(results_dfs: list[pd.DataFrame], method_names: list[str]):
     for i in range(len(method_names)):
         print(f"method: {method_names[i]}")
@@ -166,7 +193,12 @@ def get_eligible_users(config: Config, general_vars: GeneralVariables) -> list:
     return eligible_users
 
 
-def save_logs(config: Config, log_name: str, results: list[dict], hyperparameters: dict):
+def save_logs(
+    config: Config,
+    log_name: str,
+    results: list[dict],
+    hyperparameters: dict,
+) -> None:
     os.makedirs("logs", exist_ok=True)
 
     with open(f"logs/{log_name}.jsonl", "w", encoding="utf-8") as f:
@@ -225,7 +257,9 @@ def evaluate_method(
         if popularity_vars is None:
             recommended = recommend_func(config, general_vars, method_vars, user_id)
         else:
-            recommended = recommend_func(config, general_vars, popularity_vars, method_vars, user_id)
+            recommended = recommend_func(
+                config, general_vars, popularity_vars, method_vars, user_id
+            )
 
         relevant = general_vars.relevant_items_by_user[user_id]
 
@@ -248,4 +282,3 @@ def evaluate_method(
         print(method_results_df.head())
 
     return method_results, method_results_df
-

@@ -1,7 +1,14 @@
 from core.config import Config
-from core.structs import GeneralVariables, LTR_Variables, MF_Variables, PopularityVariables
+from core.structs import (
+    GeneralVariables,
+    LTR_Variables,
+    MF_Variables,
+    MMR_Variables,
+    PopularityVariables,
+)
 
 from core.utils import (
+    plot_mmr_tradeoff,
     prepare_evaluation,
     plot_training_history,
     compare_methods,
@@ -16,6 +23,7 @@ from core.utils import (
 
 from rankers.pairwise_ltr import (
     build_pairwise_training_data,
+    predict_pairwise_ltr,
     print_examples_pairwise_ltr,
     recommend_pairwise_ltr,
     train_pairwise_ltr,
@@ -26,6 +34,7 @@ from rankers.popularity import (
     print_examples_popularity,
 )
 from rankers.mf_general import (
+    predict_mf,
     prepare_md_data,
     get_md_data,
     print_rmse,
@@ -38,6 +47,7 @@ from rankers.mf_als import (
     prepare_MF_ALS_DIMata,
     train_mf_als,
 )
+from reranker.mmr import evaluate_mmr, print_mmr_example
 
 
 if __name__ == "__main__":
@@ -162,7 +172,7 @@ if __name__ == "__main__":
                 error = True
             else:
                 pairwise_ltr_vars.mf_model = method_vars[config.LTR_MF_METHOD].model
-            
+
             if error:
                 print("Skipping pairwise LTR training due to configuration issues.")
                 continue
@@ -179,16 +189,17 @@ if __name__ == "__main__":
                 method_vars[config.LTR_MF_METHOD].model,
             )
 
-        plot_training_history(
-            config,
-            method_vars[method].model["history"],
-            title=f"MF-{method.upper()} Training RMSE"
-            if method != "pairwise_ltr"
-            else "Pairwise LTR Training Loss",
-            xlabel="Epoch" if method != "mf_als" else "Iteration",
-            ylabel="Train RMSE",
-            img_name=f"{method}_training_{'rmse' if method != 'pairwise_ltr' else 'loss'}.png",
-        )
+        if config.SHOW_PLOTS or config.SAVE_IMAGES:
+            plot_training_history(
+                config,
+                method_vars[method].model["history"],
+                title=f"MF-{method.upper()} Training RMSE"
+                if method != "pairwise_ltr"
+                else "Pairwise LTR Training Loss",
+                xlabel="Epoch" if method != "mf_als" else "Iteration",
+                ylabel="Train RMSE",
+                img_name=f"{method}_training_{'rmse' if method != 'pairwise_ltr' else 'loss'}.png",
+            )
 
         method_vars[method].results, method_vars[method].results_df = evaluate_method(
             config,
@@ -225,3 +236,64 @@ if __name__ == "__main__":
             method_vars[method].results,
             method_vars[method].hyperparameters,
         )
+
+    #
+    #
+    #######################################################################
+    # MMR  #
+    #######################################################################
+
+    print("\nApplying MMR re-ranking...")
+    mmr_vars = MMR_Variables()
+    mmr_vars.hyperparameters = {
+        "M": config.TOP_M,
+        "alpha": None,  # placeholder, will be set during evaluation
+        "base_ranker": "",  # placeholder, will be set during evaluation
+    }
+
+    if any(m not in general_vars.done_methods_names for m in config.METHODS_TO_APPLY_MMR):
+        print("Error: All methods in METHODS_TO_APPLY_MMR must be trained before applying MMR.")
+    else:
+        for method in config.METHODS_TO_APPLY_MMR:
+            print(f"\nApplying MMR to {method.upper()} recommendations...")
+
+            if config.PRINT_CONFIRM:
+                print_mmr_example(
+                    config,
+                    general_vars,
+                    popularity_vars if method == "pairwise_ltr" else None,
+                    method_vars[method],
+                    user_id=1,  # example user index
+                )
+
+            mmr_vars.results, mmr_vars.results_df = evaluate_mmr(
+                config,
+                general_vars,
+                method_vars[method],
+                predict_func=predict_mf if method != "pairwise_ltr" else predict_pairwise_ltr,
+                popularity_vars=popularity_vars if method == "pairwise_ltr" else None,
+            )
+
+            mmr_summary_df = (
+                mmr_vars.results_df.groupby("alpha")[["recall@10", "ndcg@10", "diversity@10"]]
+                .mean()
+                .reset_index()
+            )
+
+            if config.PRINT_CONFIRM:
+                print(mmr_summary_df)
+
+            if config.SHOW_PLOTS or config.SAVE_IMAGES:
+                plot_mmr_tradeoff(
+                    config,
+                    mmr_summary_df,
+                    method,
+                )
+
+            mmr_vars.hyperparameters["base_ranker"] = method
+            save_logs(
+                config,
+                f"mmr_{method}_eval",
+                method_vars[method].results,
+                method_vars[method].hyperparameters,
+            )

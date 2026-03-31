@@ -32,6 +32,8 @@ class Config:
     LTR_MF_METHOD: str = "mf_sgd"  # or "mf_als"
 
     TOP_M: int = None
+    MMR_ALPHA_VALUES: list[float] = [0.1, 0.4, 0.7]
+    METHODS_TO_APPLY_MMR: list[str] = ["mf_sgd", "mf_als", "pairwise_ltr"]  # or just a subset
 
     def __init__(self):
         if Config.FAST_MODE:

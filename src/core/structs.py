@@ -31,14 +31,15 @@ class GeneralVariables:
 
     train_data: list = None
     test_data: list = None
-    
+
     user_ratings_train: defaultdict[list] = None
     item_ratings_train: defaultdict[list] = None
-    
+
     done_methods_names: set = None
-    
+
     def __init__(self):
         self.done_methods_names = set()
+
 
 class PopularityVariables:
     item_popularity: dict = None
@@ -53,25 +54,32 @@ class MF_Variables:
 
     results: list = None
     results_df: pd.DataFrame = None
-    
+
     hyperparameters: dict = None
-    
+
     def __init__(self, method_name: str):
         self.method_name = method_name
-        
+
+
 class LTR_Variables:
     model: dict = None
     method_name: str
-    
+
     mf_model: dict = None
-    
+
     train_data: list[tuple[int, int, int]] = None
 
     results: list = None
     results_df: pd.DataFrame = None
-    
+
     hyperparameters: dict = None
-    
+
     def __init__(self, method_name: str):
         self.method_name = method_name
-    
+
+
+class MMR_Variables:
+    results: list = None
+    results_df: pd.DataFrame = None
+
+    hyperparameters: dict = None
