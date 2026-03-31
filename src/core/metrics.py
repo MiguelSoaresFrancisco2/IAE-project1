@@ -69,3 +69,5 @@ def diversity_at_k(recommended: list, item_genre_vectors: dict, k: int = 10) -> 
         return 0.0
 
     return float(np.mean(pairwise_distances))
+
+

@@ -1,7 +1,6 @@
 import os
 import json
 
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -65,34 +64,10 @@ def compare_methods(results_dfs: list[pd.DataFrame], method_names: list[str]):
         print(f"diversity@10: {results_dfs[i]['diversity@10'].mean()}")
 
 
-def compute_rmse(
-    general_vars: GeneralVariables,
-    data: list[tuple[int, int, float]],
-    model: dict,
-    prediction_func: callable,
-) -> float:
-    errors = []
-    for u_idx, i_idx, rating in data:
-        user_id = general_vars.index_to_user[u_idx]
-        item_id = general_vars.index_to_item[i_idx]
-
-        pred = prediction_func(general_vars, model, user_id, item_id)
-
-        errors.append((rating - pred) ** 2)
-    return float(np.sqrt(np.mean(errors)))
 
 
-def print_rmse(
-    general_vars: GeneralVariables,
-    model: dict,
-    prediction_func: callable,
-):
-    test_rmse = compute_rmse(general_vars, general_vars.test_data, model, prediction_func)
 
-    train_rmse = compute_rmse(general_vars, general_vars.train_data, model, prediction_func)
 
-    print("Test RMSE:", test_rmse)
-    print("Train RMSE:", train_rmse)
 
 
 def load_data(config: Config) -> tuple[pd.DataFrame, pd.DataFrame]:

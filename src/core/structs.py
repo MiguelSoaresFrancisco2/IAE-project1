@@ -1,4 +1,5 @@
 import pandas as pd
+from collections import defaultdict
 
 
 class GeneralVariables:
@@ -30,7 +31,14 @@ class GeneralVariables:
 
     train_data: list = None
     test_data: list = None
-
+    
+    user_ratings_train: defaultdict[list] = None
+    item_ratings_train: defaultdict[list] = None
+    
+    done_methods_names: set = None
+    
+    def __init__(self):
+        self.done_methods_names = set()
 
 class PopularityVariables:
     item_popularity: dict = None
@@ -39,9 +47,15 @@ class PopularityVariables:
     results_df: pd.DataFrame = None
 
 
-class MF_SGDVariables:
+class MF_Variables:
     model: dict = None
-    model_name: str = "mf_sgd"
+    model_name: str
 
     results: list = None
     results_df: pd.DataFrame = None
+    
+    hyperparameters: dict = None
+    
+    def __init__(self, model_name: str):
+        self.model_name = model_name
+    

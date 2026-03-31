@@ -1,11 +1,10 @@
 from core.config import Config
-from core.structs import GeneralVariables, MF_SGDVariables, PopularityVariables
+from core.structs import GeneralVariables, MF_Variables, PopularityVariables
 
 from core.utils import (
     prepare_evaluation,
     plot_training_history,
     compare_methods,
-    print_rmse,
     get_eligible_users,
     load_data,
     get_train_test_split,
@@ -13,14 +12,24 @@ from core.utils import (
     save_logs,
 )
 
-from rankers.popularity import evaluate_popularity, get_item_popularity, print_examples_popularity
+from rankers.popularity import (
+    evaluate_popularity,
+    get_item_popularity,
+    print_examples_popularity,
+)
+from rankers.mf_general import (
+    prepare_md_data,
+    get_md_data,
+    evaluate_mf,
+    print_examples_mf,
+    print_rmse,
+)
 from rankers.mf_sgd import (
-    evaluate_mf_sgd,
-    predict_mf_sgd,
-    prepare_md_sgd_data,
     train_mf_sgd,
-    get_md_sgd_data,
-    print_examples_mf_sgd,
+)
+from rankers.mf_als import (
+    prepare_MF_ALS_DIMata,
+    train_mf_als,
 )
 
 
@@ -74,10 +83,28 @@ if __name__ == "__main__":
     #
     #
     ##########################################################
-    #   MATRIX FACTORIZATION WITH SGD RECOMMENDER (MF_SGD)   #
+    # MATRIX FACTORIZATION WITH SGD AND WITH ALS RECOMMENDER #
     ##########################################################
 
-    mf_sgd_vars = MF_SGDVariables()
+    mf_sgd_vars = MF_Variables("mf_sgd")
+    mf_als_vars = MF_Variables("mf_als")
+    mf_sgd_vars.hyperparameters = {
+        "k": config.TOP_K,
+        "d": config.MF_SGD_DIM,
+        "lr": config.MF_SGD_LR,
+        "reg": config.MF_SGD_REG,
+        "epochs": config.MF_SGD_EPOCHS,
+    }
+    mf_als_vars.hyperparameters = {
+        "k": config.TOP_K,
+        "d": config.MF_ALS_DIM,
+        "reg": config.MF_ALS_REG,
+        "iters": config.MF_ALS_ITERS,
+    }
+    mf_vars = {
+        "mf_sgd": mf_sgd_vars,
+        "mf_als": mf_als_vars,
+    }
 
     (
         general_vars.unique_user_ids,
@@ -88,62 +115,58 @@ if __name__ == "__main__":
         general_vars.index_to_item,
         general_vars.n_users,
         general_vars.n_items,
-    ) = prepare_md_sgd_data(config, general_vars)
+    ) = prepare_md_data(config, general_vars)
 
-    general_vars.train_data, general_vars.test_data = get_md_sgd_data(config, general_vars)
+    general_vars.train_data, general_vars.test_data = get_md_data(config, general_vars)
 
-    mf_sgd_vars.model = train_mf_sgd(config, general_vars)
-
-    plot_training_history(
-        mf_sgd_vars.model["history"],
-        title="MF-SGD Training RMSE",
-        xlabel="Epoch",
-        ylabel="Train RMSE",
-        img_name="mf_sgd_training_rmse.png",
-        save_img=True,
+    general_vars.user_ratings_train, general_vars.item_ratings_train = prepare_MF_ALS_DIMata(
+        general_vars
     )
 
-    mf_sgd_vars.results, mf_sgd_vars.results_df = evaluate_mf_sgd(
-        config,
-        general_vars,
-        mf_sgd_vars,
-    )
+    for method in config.METHODS:
+        print(f"Training {method.upper()}...")
 
-    if config.PRINT_CONFIRM:
-        print(mf_sgd_vars.results_df[["recall@10", "ndcg@10", "diversity@10"]].mean())
-        print_examples_mf_sgd(
+        if method == "mf_sgd":
+            mf_vars[method].model = train_mf_sgd(config, general_vars)
+        elif method == "mf_als":
+            mf_vars[method].model = train_mf_als(config, general_vars)
+
+        plot_training_history(
+            mf_vars[method].model["history"],
+            title=f"MF-{method.upper()} Training RMSE",
+            xlabel="Epoch" if method == "mf_sgd" else "Iteration",
+            ylabel="Train RMSE",
+            img_name=f"{method}_training_rmse.png",
+            save_img=True,
+        )
+
+        mf_vars[method].results, mf_vars[method].results_df = evaluate_mf(
             config,
             general_vars,
-            mf_sgd_vars,
-            1,  # example user index
+            mf_vars[method],
         )
+        general_vars.done_methods_names.add(method)
 
-    if config.COMPARE_METHODS:
-        compare_methods(
-            [popularity_vars.results_df, mf_sgd_vars.results_df], ["popularity", "mf_sgd"]
+        if config.PRINT_CONFIRM:
+            print_examples_mf(
+                config,
+                general_vars,
+                mf_vars[method],
+                1,  # example user index
+            )
+            print(mf_vars[method].results_df[["recall@10", "ndcg@10", "diversity@10"]].mean())
+            print_rmse(general_vars, mf_vars[method].model)
+
+        if config.COMPARE_METHODS:
+            dfs_to_compare = [popularity_vars.results_df] + [
+                mf_vars[m].results_df for m in general_vars.done_methods_names
+            ]
+            names_to_compare = [m for m in general_vars.done_methods_names]
+            compare_methods(dfs_to_compare, names_to_compare)
+
+        save_logs(
+            config,
+            f"{method}_eval",
+            mf_vars[method].results,
+            mf_vars[method].hyperparameters,
         )
-
-    save_logs(
-        config,
-        "mf_sgd_eval",
-        mf_sgd_vars.results,
-        {
-            "k": config.TOP_K,
-            "d": mf_sgd_vars.model["params"]["d"],
-            "lr": mf_sgd_vars.model["params"]["lr"],
-            "reg": mf_sgd_vars.model["params"]["reg"],
-            "epochs": mf_sgd_vars.model["params"]["epochs"],
-        },
-    )
-
-    if config.PRINT_CONFIRM:
-        print_rmse(general_vars, mf_sgd_vars.model, predict_mf_sgd)
-
-
-    #
-    #
-    ##########################################################
-    #   MATRIX FACTORIZATION WITH SGD RECOMMENDER (MF_SGD)   #
-    ##########################################################
-
-
