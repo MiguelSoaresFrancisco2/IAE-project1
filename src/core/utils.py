@@ -51,7 +51,8 @@ def plot_training_history(
     plt.title(title)
     plt.grid(True)
     if save_img:
-        plt.savefig(img_name)
+        os.makedirs("images", exist_ok=True)
+        plt.savefig(f"images/{img_name}")
     plt.show()
     
 
