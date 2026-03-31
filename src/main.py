@@ -1,5 +1,5 @@
 from core.config import Config
-from core.structs import GeneralVariables, MF_Variables, PopularityVariables
+from core.structs import GeneralVariables, LTR_Variables, MF_Variables, PopularityVariables
 
 from core.utils import (
     prepare_evaluation,
@@ -9,9 +9,17 @@ from core.utils import (
     load_data,
     get_train_test_split,
     get_genre_vectors,
+    print_examples_recommendations,
     save_logs,
+    evaluate_method,
 )
 
+from rankers.pairwise_ltr import (
+    build_pairwise_training_data,
+    print_examples_pairwise_ltr,
+    recommend_pairwise_ltr,
+    train_pairwise_ltr,
+)
 from rankers.popularity import (
     evaluate_popularity,
     get_item_popularity,
@@ -20,9 +28,8 @@ from rankers.popularity import (
 from rankers.mf_general import (
     prepare_md_data,
     get_md_data,
-    evaluate_mf,
-    print_examples_mf,
     print_rmse,
+    recommend_mf,
 )
 from rankers.mf_sgd import (
     train_mf_sgd,
@@ -53,9 +60,9 @@ if __name__ == "__main__":
 
     #
     #
-    ##########################################################
-    #              POPULARITY-BASED RECOMMENDER              #
-    ##########################################################
+    #######################################################################
+    #                     POPULARITY-BASED RECOMMENDER                    #
+    #######################################################################
 
     popularity_vars = PopularityVariables()
 
@@ -82,12 +89,14 @@ if __name__ == "__main__":
 
     #
     #
-    ##########################################################
-    # MATRIX FACTORIZATION WITH SGD AND WITH ALS RECOMMENDER #
-    ##########################################################
+    #######################################################################
+    # MATRIX FACTORIZATION WITH SGD AND ALS AND PAIRWISE LTR RECOMMENDERS #
+    #######################################################################
 
     mf_sgd_vars = MF_Variables("mf_sgd")
     mf_als_vars = MF_Variables("mf_als")
+    pairwise_ltr_vars = LTR_Variables("pairwise_ltr")
+
     mf_sgd_vars.hyperparameters = {
         "k": config.TOP_K,
         "d": config.MF_SGD_DIM,
@@ -101,9 +110,18 @@ if __name__ == "__main__":
         "reg": config.MF_ALS_REG,
         "iters": config.MF_ALS_ITERS,
     }
-    mf_vars = {
+    pairwise_ltr_vars.hyperparameters = {
+        "k": config.TOP_K,
+        "epochs": config.LTR_EPOCHS,
+        "lr": config.LTR_LR,
+        "reg": config.LTR_REG,
+        "max_pairs_per_user": config.LTR_MAX_PAIRS_PER_USER,
+    }
+
+    method_vars: dict[str, MF_Variables | LTR_Variables] = {
         "mf_sgd": mf_sgd_vars,
         "mf_als": mf_als_vars,
+        "pairwise_ltr": pairwise_ltr_vars,
     }
 
     (
@@ -127,39 +145,76 @@ if __name__ == "__main__":
         print(f"Training {method.upper()}...")
 
         if method == "mf_sgd":
-            mf_vars[method].model = train_mf_sgd(config, general_vars)
+            method_vars[method].model = train_mf_sgd(config, general_vars)
         elif method == "mf_als":
-            mf_vars[method].model = train_mf_als(config, general_vars)
+            method_vars[method].model = train_mf_als(config, general_vars)
+        elif method == "pairwise_ltr":
+            error = False
+            if config.LTR_MF_METHOD not in config.METHODS:
+                print(
+                    f"Error: LTR_MF_METHOD '{config.LTR_MF_METHOD}' must be in METHODS for pairwise LTR."
+                )
+                error = True
+            elif config.LTR_MF_METHOD not in general_vars.done_methods_names:
+                print(
+                    f"Error: LTR_MF_METHOD '{config.LTR_MF_METHOD}' must be trained before pairwise LTR."
+                )
+                error = True
+            else:
+                pairwise_ltr_vars.mf_model = method_vars[config.LTR_MF_METHOD].model
+            
+            if error:
+                print("Skipping pairwise LTR training due to configuration issues.")
+                continue
+
+            method_vars[method].train_data = build_pairwise_training_data(config, general_vars)
+            if config.PRINT_CONFIRM:
+                print_examples_pairwise_ltr(method_vars[method].train_data)
+
+            pairwise_ltr_vars.model = train_pairwise_ltr(
+                config,
+                general_vars,
+                popularity_vars,
+                pairwise_ltr_vars,
+                method_vars[config.LTR_MF_METHOD].model,
+            )
 
         plot_training_history(
             config,
-            mf_vars[method].model["history"],
-            title=f"MF-{method.upper()} Training RMSE",
-            xlabel="Epoch" if method == "mf_sgd" else "Iteration",
+            method_vars[method].model["history"],
+            title=f"MF-{method.upper()} Training RMSE"
+            if method != "pairwise_ltr"
+            else "Pairwise LTR Training Loss",
+            xlabel="Epoch" if method != "mf_als" else "Iteration",
             ylabel="Train RMSE",
-            img_name=f"{method}_training_rmse.png",
+            img_name=f"{method}_training_{'rmse' if method != 'pairwise_ltr' else 'loss'}.png",
         )
 
-        mf_vars[method].results, mf_vars[method].results_df = evaluate_mf(
+        method_vars[method].results, method_vars[method].results_df = evaluate_method(
             config,
             general_vars,
-            mf_vars[method],
+            method_vars[method],
+            recommend_func=recommend_mf if method != "pairwise_ltr" else recommend_pairwise_ltr,
+            popularity_vars=popularity_vars if method == "pairwise_ltr" else None,
         )
         general_vars.done_methods_names.add(method)
 
         if config.PRINT_CONFIRM:
-            print_examples_mf(
+            print_examples_recommendations(
                 config,
                 general_vars,
-                mf_vars[method],
-                1,  # example user index
+                method_vars[method],
+                recommend_func=recommend_mf if method != "pairwise_ltr" else recommend_pairwise_ltr,
+                user_id=1,  # example user index
+                popularity_vars=popularity_vars if method == "pairwise_ltr" else None,
             )
-            print(mf_vars[method].results_df[["recall@10", "ndcg@10", "diversity@10"]].mean())
-            print_rmse(general_vars, mf_vars[method].model)
+            print(method_vars[method].results_df[["recall@10", "ndcg@10", "diversity@10"]].mean())
+            if method != "pairwise_ltr":
+                print_rmse(general_vars, method_vars[method].model)
 
         if config.COMPARE_METHODS:
             dfs_to_compare = [popularity_vars.results_df] + [
-                mf_vars[m].results_df for m in general_vars.done_methods_names
+                method_vars[m].results_df for m in general_vars.done_methods_names
             ]
             names_to_compare = [m for m in general_vars.done_methods_names]
             compare_methods(dfs_to_compare, names_to_compare)
@@ -167,6 +222,6 @@ if __name__ == "__main__":
         save_logs(
             config,
             f"{method}_eval",
-            mf_vars[method].results,
-            mf_vars[method].hyperparameters,
+            method_vars[method].results,
+            method_vars[method].hyperparameters,
         )

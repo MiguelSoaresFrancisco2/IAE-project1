@@ -9,7 +9,7 @@ class Config:
     PRINT_CONFIRM: bool = True
 
     COMPARE_METHODS: bool = True
-    METHODS: list[str] = ["mf_sgd", "mf_als"]
+    METHODS: list[str] = ["mf_sgd", "mf_als", "pairwise_ltr"]
 
     RANDOM_STATE: int = 42
 
@@ -24,6 +24,12 @@ class Config:
     MF_ALS_ITERS: int = 8
     MF_ALS_DIM: int = 20
     MF_ALS_REG: float = 0.05
+
+    LTR_MAX_PAIRS_PER_USER: int = 50
+    LTR_EPOCHS: int = 5
+    LTR_LR: float = 0.01
+    LTR_REG: float = 0.001
+    LTR_MF_METHOD: str = "mf_sgd"  # or "mf_als"
 
     TOP_M: int = None
 

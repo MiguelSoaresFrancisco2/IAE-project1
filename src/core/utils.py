@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 
 from core.config import Config
-from core.structs import GeneralVariables
+from core.metrics import diversity_at_k, ndcg_at_k, recall_at_k
+from core.structs import GeneralVariables, LTR_Variables, MF_Variables, PopularityVariables
 
 
 def prepare_evaluation(
@@ -189,3 +190,62 @@ def save_logs(config: Config, log_name: str, results: list[dict], hyperparameter
         with open(f"logs/{log_name}.jsonl", "r", encoding="utf-8") as f:
             for _ in range(3):
                 print(f.readline().strip())
+
+
+def print_examples_recommendations(
+    config: Config,
+    general_vars: GeneralVariables,
+    model_vars: MF_Variables | LTR_Variables,
+    recommend_func: callable,
+    user_id: int,
+    popularity_vars: PopularityVariables | None = None,
+) -> None:
+
+    if popularity_vars is None:
+        example_recs_mf = recommend_func(config, general_vars, model_vars, user_id)
+    else:
+        example_recs_mf = recommend_func(config, general_vars, popularity_vars, model_vars, user_id)
+
+    print("User:", user_id)
+    print(f"Top-10 {model_vars.method_name.upper()} item ids:", example_recs_mf)
+
+    general_vars.items[general_vars.items["item_id"].isin(example_recs_mf)][["item_id", "title"]]
+
+
+def evaluate_method(
+    config: Config,
+    general_vars: GeneralVariables,
+    method_vars: MF_Variables | LTR_Variables,
+    recommend_func: callable,
+    popularity_vars: PopularityVariables | None = None,
+) -> tuple[list, pd.DataFrame]:
+    method_results = [{} for _ in range(len(general_vars.eligible_users))]
+
+    for user_id in general_vars.eligible_users:
+        if popularity_vars is None:
+            recommended = recommend_func(config, general_vars, method_vars, user_id)
+        else:
+            recommended = recommend_func(config, general_vars, popularity_vars, method_vars, user_id)
+
+        relevant = general_vars.relevant_items_by_user[user_id]
+
+        recall = recall_at_k(recommended, relevant, k=config.TOP_K)
+        ndcg = ndcg_at_k(recommended, relevant, k=config.TOP_K)
+        diversity = diversity_at_k(recommended, general_vars.item_genre_vectors, k=config.TOP_K)
+
+        method_results[general_vars.eligible_users.index(user_id)] = {
+            "user_id": int(user_id),
+            "method": method_vars.method_name,
+            "top_k": recommended,
+            "recall@10": recall,
+            "ndcg@10": ndcg,
+            "diversity@10": diversity,
+        }
+
+    method_results_df = pd.DataFrame(method_results)
+
+    if config.PRINT_CONFIRM:
+        print(method_results_df.head())
+
+    return method_results, method_results_df
+

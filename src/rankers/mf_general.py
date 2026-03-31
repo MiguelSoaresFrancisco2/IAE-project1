@@ -1,10 +1,8 @@
-import pandas as pd
 import numpy as np
 
 from core.config import Config
 from core.structs import GeneralVariables, MF_Variables
 from core.utils import get_candidates
-from core.metrics import recall_at_k, ndcg_at_k, diversity_at_k
 
 
 def prepare_md_data(config: Config, general_vars: GeneralVariables) -> tuple:
@@ -106,50 +104,6 @@ def recommend_mf(
 
     ranked_items = sorted(scored_items, key=lambda x: x[1], reverse=True)
     return [int(item_id) for item_id, _ in ranked_items[: config.TOP_K]]
-
-
-def evaluate_mf(
-    config: Config, general_vars: GeneralVariables, mf_vars: MF_Variables
-) -> tuple[list, pd.DataFrame]:
-    mf_results = [{} for _ in range(len(general_vars.eligible_users))]
-
-    for user_id in general_vars.eligible_users:
-        recommended = recommend_mf(config, general_vars, mf_vars, user_id)
-        relevant = general_vars.relevant_items_by_user[user_id]
-
-        recall = recall_at_k(recommended, relevant, k=config.TOP_K)
-        ndcg = ndcg_at_k(recommended, relevant, k=config.TOP_K)
-        diversity = diversity_at_k(recommended, general_vars.item_genre_vectors, k=config.TOP_K)
-
-        mf_results[general_vars.eligible_users.index(user_id)] = {
-            "user_id": int(user_id),
-            "method": mf_vars.model_name,
-            "top_k": recommended,
-            "recall@10": recall,
-            "ndcg@10": ndcg,
-            "diversity@10": diversity,
-        }
-
-    mf_results_df = pd.DataFrame(mf_results)
-
-    if config.PRINT_CONFIRM:
-        print(mf_results_df.head())
-
-    return mf_results, mf_results_df
-
-
-def print_examples_mf(
-    config: Config,
-    general_vars: GeneralVariables,
-    mf_vars: MF_Variables,
-    user_id: int,
-):
-    example_recs_mf = recommend_mf(config, general_vars, mf_vars, user_id)
-
-    print("User:", user_id)
-    print("Top-10 MF-SGD item ids:", example_recs_mf)
-
-    general_vars.items[general_vars.items["item_id"].isin(example_recs_mf)][["item_id", "title"]]
 
 
 def compute_rmse(

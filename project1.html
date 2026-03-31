@@ -10709,7 +10709,7 @@ dtype: float64</pre>
           <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
             <div class="cm-editor cm-s-jupyter">
               <div class="highlight hl-ipython3">
-                <pre><span></span><span class="k">def</span> <span class="nf">build_pairwise_training_data</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">max_pairs_per_user</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">):</span>
+                <pre><span></span><span class="k">def</span> <span class="nf">build_pairwise_training_data</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">LTR_MAX_PAIRS_PER_USER</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">):</span>
     <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">random_state</span><span class="p">)</span>
     <span class="n">pairwise_examples</span> <span class="o">=</span> <span class="p">[]</span>
 
@@ -10724,8 +10724,8 @@ dtype: float64</pre>
 
         <span class="n">possible_pairs</span> <span class="o">=</span> <span class="p">[(</span><span class="n">i_pos</span><span class="p">,</span> <span class="n">i_neg</span><span class="p">)</span> <span class="k">for</span> <span class="n">i_pos</span> <span class="ow">in</span> <span class="n">positives</span> <span class="k">for</span> <span class="n">i_neg</span> <span class="ow">in</span> <span class="n">negatives</span><span class="p">]</span>
 
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">possible_pairs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">max_pairs_per_user</span><span class="p">:</span>
-            <span class="n">sampled_indices</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">possible_pairs</span><span class="p">),</span> <span class="n">size</span><span class="o">=</span><span class="n">max_pairs_per_user</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">possible_pairs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">LTR_MAX_PAIRS_PER_USER</span><span class="p">:</span>
+            <span class="n">sampled_indices</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">possible_pairs</span><span class="p">),</span> <span class="n">size</span><span class="o">=</span><span class="n">LTR_MAX_PAIRS_PER_USER</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
             <span class="n">selected_pairs</span> <span class="o">=</span> <span class="p">[</span><span class="n">possible_pairs</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">sampled_indices</span><span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">selected_pairs</span> <span class="o">=</span> <span class="n">possible_pairs</span>
@@ -10752,7 +10752,7 @@ dtype: float64</pre>
               <div class="highlight hl-ipython3">
                 <pre><span></span><span class="n">pairwise_train_examples</span> <span class="o">=</span> <span class="n">build_pairwise_training_data</span><span class="p">(</span>
     <span class="n">train_df</span><span class="o">=</span><span class="n">train_df</span><span class="p">,</span>
-    <span class="n">max_pairs_per_user</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+    <span class="n">LTR_MAX_PAIRS_PER_USER</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
     <span class="n">random_state</span><span class="o">=</span><span class="n">RANDOM_STATE</span>
 <span class="p">)</span>
 
@@ -11393,7 +11393,7 @@ dtype: float64</pre>
                 <span class="s2">"epochs"</span><span class="p">:</span> <span class="n">pairwise_ltr_model</span><span class="p">[</span><span class="s2">"params"</span><span class="p">][</span><span class="s2">"epochs"</span><span class="p">],</span>
                 <span class="s2">"lr"</span><span class="p">:</span> <span class="n">pairwise_ltr_model</span><span class="p">[</span><span class="s2">"params"</span><span class="p">][</span><span class="s2">"lr"</span><span class="p">],</span>
                 <span class="s2">"reg"</span><span class="p">:</span> <span class="n">pairwise_ltr_model</span><span class="p">[</span><span class="s2">"params"</span><span class="p">][</span><span class="s2">"reg"</span><span class="p">],</span>
-                <span class="s2">"max_pairs_per_user"</span><span class="p">:</span> <span class="mi">50</span>
+                <span class="s2">"LTR_MAX_PAIRS_PER_USER"</span><span class="p">:</span> <span class="mi">50</span>
             <span class="p">}</span>
         <span class="p">}</span>
         <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">log_entry</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
@@ -11444,9 +11444,9 @@ dtype: float64</pre>
           <div class="jp-OutputArea-child">
             <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
             <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-              <pre>{"user_id": 1, "method": "pairwise_ltr", "top_k": [100, 181, 258, 286, 288, 1, 294, 300, 237, 313], "metrics": {"recall@10": 0.11764705882352941, "ndcg@10": 0.5473983622993502, "diversity@10": 0.7914912521185643}, "hyperparameters": {"k": 10, "epochs": 5, "lr": 0.01, "reg": 0.001, "max_pairs_per_user": 50}}
-{"user_id": 2, "method": "pairwise_ltr", "top_k": [181, 98, 174, 56, 121, 7, 172, 173, 117, 222], "metrics": {"recall@10": 0.0, "ndcg@10": 0.0, "diversity@10": 0.6130857220128889}, "hyperparameters": {"k": 10, "epochs": 5, "lr": 0.01, "reg": 0.001, "max_pairs_per_user": 50}}
-{"user_id": 3, "method": "pairwise_ltr", "top_k": [50, 100, 181, 286, 127, 294, 1, 98, 174, 56], "metrics": {"recall@10": 0.3333333333333333, "ndcg@10": 0.23463936301137822, "diversity@10": 0.7709495353397355}, "hyperparameters": {"k": 10, "epochs": 5, "lr": 0.01, "reg": 0.001, "max_pairs_per_user": 50}}
+              <pre>{"user_id": 1, "method": "pairwise_ltr", "top_k": [100, 181, 258, 286, 288, 1, 294, 300, 237, 313], "metrics": {"recall@10": 0.11764705882352941, "ndcg@10": 0.5473983622993502, "diversity@10": 0.7914912521185643}, "hyperparameters": {"k": 10, "epochs": 5, "lr": 0.01, "reg": 0.001, "LTR_MAX_PAIRS_PER_USER": 50}}
+{"user_id": 2, "method": "pairwise_ltr", "top_k": [181, 98, 174, 56, 121, 7, 172, 173, 117, 222], "metrics": {"recall@10": 0.0, "ndcg@10": 0.0, "diversity@10": 0.6130857220128889}, "hyperparameters": {"k": 10, "epochs": 5, "lr": 0.01, "reg": 0.001, "LTR_MAX_PAIRS_PER_USER": 50}}
+{"user_id": 3, "method": "pairwise_ltr", "top_k": [50, 100, 181, 286, 127, 294, 1, 98, 174, 56], "metrics": {"recall@10": 0.3333333333333333, "ndcg@10": 0.23463936301137822, "diversity@10": 0.7709495353397355}, "hyperparameters": {"k": 10, "epochs": 5, "lr": 0.01, "reg": 0.001, "LTR_MAX_PAIRS_PER_USER": 50}}
 </pre>
             </div>
           </div>

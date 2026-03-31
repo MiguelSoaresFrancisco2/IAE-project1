@@ -49,13 +49,29 @@ class PopularityVariables:
 
 class MF_Variables:
     model: dict = None
-    model_name: str
+    method_name: str
 
     results: list = None
     results_df: pd.DataFrame = None
     
     hyperparameters: dict = None
     
-    def __init__(self, model_name: str):
-        self.model_name = model_name
+    def __init__(self, method_name: str):
+        self.method_name = method_name
+        
+class LTR_Variables:
+    model: dict = None
+    method_name: str
+    
+    mf_model: dict = None
+    
+    train_data: list[tuple[int, int, int]] = None
+
+    results: list = None
+    results_df: pd.DataFrame = None
+    
+    hyperparameters: dict = None
+    
+    def __init__(self, method_name: str):
+        self.method_name = method_name
     
