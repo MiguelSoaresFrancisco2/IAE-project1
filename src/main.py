@@ -132,12 +132,12 @@ if __name__ == "__main__":
             mf_vars[method].model = train_mf_als(config, general_vars)
 
         plot_training_history(
+            config,
             mf_vars[method].model["history"],
             title=f"MF-{method.upper()} Training RMSE",
             xlabel="Epoch" if method == "mf_sgd" else "Iteration",
             ylabel="Train RMSE",
             img_name=f"{method}_training_rmse.png",
-            save_img=True,
         )
 
         mf_vars[method].results, mf_vars[method].results_df = evaluate_mf(

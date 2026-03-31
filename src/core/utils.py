@@ -31,12 +31,12 @@ def prepare_evaluation(
 
 
 def plot_training_history(
+    config: Config,
     history: list,
     title: str,
     xlabel: str,
     ylabel: str,
     img_name: str,
-    save_img: bool = False,
     figsize: tuple = (8, 4),
     marker: str = "o",
 ):
@@ -49,11 +49,11 @@ def plot_training_history(
     plt.ylabel(ylabel)
     plt.title(title)
     plt.grid(True)
-    if save_img:
+    if config.SAVE_IMAGES:
         os.makedirs("images", exist_ok=True)
         plt.savefig(f"images/{img_name}")
-    plt.show()
-    
+    if config.SHOW_PLOTS:
+        plt.show()
 
 
 def compare_methods(results_dfs: list[pd.DataFrame], method_names: list[str]):
@@ -62,12 +62,6 @@ def compare_methods(results_dfs: list[pd.DataFrame], method_names: list[str]):
         print(f"recall@10: {results_dfs[i]['recall@10'].mean()}")
         print(f"ndcg@10: {results_dfs[i]['ndcg@10'].mean()}")
         print(f"diversity@10: {results_dfs[i]['diversity@10'].mean()}")
-
-
-
-
-
-
 
 
 def load_data(config: Config) -> tuple[pd.DataFrame, pd.DataFrame]:

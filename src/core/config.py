@@ -4,6 +4,8 @@ import numpy as np
 
 class Config:
     FAST_MODE: bool = True
+    SAVE_IMAGES: bool = True
+    SHOW_PLOTS: bool = False
     PRINT_CONFIRM: bool = True
 
     COMPARE_METHODS: bool = True
