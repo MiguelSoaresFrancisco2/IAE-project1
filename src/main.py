@@ -247,7 +247,7 @@ if __name__ == "__main__":
     mmr_vars = MMR_Variables()
     mmr_vars.hyperparameters = {
         "M": config.TOP_M,
-        "alpha": None,  # placeholder, will be set during evaluation
+        "alpha": config.MMR_ALPHA_VALUES,
         "base_ranker": "",  # placeholder, will be set during evaluation
     }
 
@@ -294,6 +294,6 @@ if __name__ == "__main__":
             save_logs(
                 config,
                 f"mmr_{method}_eval",
-                method_vars[method].results,
-                method_vars[method].hyperparameters,
+                mmr_vars.results,
+                mmr_vars.hyperparameters,
             )
