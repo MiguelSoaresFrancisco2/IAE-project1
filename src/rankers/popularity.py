@@ -1,9 +1,7 @@
-import pandas as pd
-
 from core.config import Config
-from core.structs import GeneralVariables, PopularityVariables
+from core.structs import GeneralVariables, PopularityVariables, ResultBundle
 
-from core.utils import get_candidates
+from core.candidates import get_candidates
 
 from core.metrics import recall_at_k, ndcg_at_k, diversity_at_k
 
@@ -34,7 +32,7 @@ def evaluate_popularity(
     config: Config,
     general_vars: GeneralVariables,
     popularity_vars: PopularityVariables,
-) -> tuple[list, pd.DataFrame]:
+) -> ResultBundle:
     results = [{} for _ in range(len(general_vars.eligible_users))]
 
     for user_id in general_vars.eligible_users:
@@ -54,11 +52,11 @@ def evaluate_popularity(
             "diversity@10": diversity,
         }
 
-    results_df = pd.DataFrame(results)
+    result_bundle = ResultBundle.from_rows(results)
     if config.PRINT_CONFIRM:
-        print(results_df.head())
+        print(result_bundle.df.head())
 
-    return results, results_df
+    return result_bundle
 
 
 def print_examples_popularity(
@@ -69,7 +67,7 @@ def print_examples_popularity(
 ):
     example_recs = recommend_popularity(config, general_vars, popularity_vars, user_id)
 
-    print("User:", general_vars.eligible_users[user_id])
+    print("User:", user_id)
     print("Top-10 item ids:", example_recs)
 
     print(

@@ -4,7 +4,7 @@ import pandas as pd
 from core.config import Config
 
 from core.structs import EMA_Variables, GeneralVariables, PopularityVariables
-from core.utils import get_candidates
+from core.candidates import get_candidates
 from rankers.pairwise_ltr import predict_pairwise_ltr
 from core.structs import LTR_Variables
 
@@ -19,9 +19,9 @@ def normalize_vector(vec: np.ndarray) -> np.ndarray:
 def get_initial_user_state(
     general_vars: GeneralVariables,
     mf_model: dict,
-    user_id: str,
+    user_id: int,
 ) -> np.ndarray:
-    u_idx = general_vars.user_to_index[user_id]
+    u_idx = general_vars.index_map.user_to_index[user_id]
     return normalize_vector(mf_model["P"][u_idx].copy())
 
 
@@ -31,7 +31,7 @@ def ema_update_user_state(
     ema_vars: EMA_Variables,
     item_id: int,
 ) -> np.ndarray:
-    i_idx = general_vars.item_to_index[str(item_id)]
+    i_idx = general_vars.index_map.item_to_index[item_id]
     item_vector = ema_vars.mf_model["Q"][i_idx]
 
     updated_state = (1 - config.EMA_RHO) * ema_vars.session_state + config.EMA_RHO * item_vector
@@ -50,6 +50,7 @@ def session_adjusted_score(
     item_id: int,
 ) -> float:
     base_score = predict_pairwise_ltr(
+        config,
         general_vars,
         popularity_vars,
         ltr_vars,
@@ -57,8 +58,8 @@ def session_adjusted_score(
         item_id,
     )
 
-    i_idx = general_vars.item_to_index[str(item_id)]
-    item_vector = normalize_vector(ltr_vars.mf_model["Q"][i_idx])
+    i_idx = general_vars.index_map.item_to_index[item_id]
+    item_vector = normalize_vector(ema_vars.mf_model["Q"][i_idx])
 
     session_affinity = float(np.dot(ema_vars.session_state, item_vector))
 
@@ -102,7 +103,7 @@ def simulate_user_choice(
     best_score = -float("inf")
 
     for item_id in ema_vars.recommended_items:
-        i_idx = general_vars.item_to_index[item_id]
+        i_idx = general_vars.index_map.item_to_index[item_id]
         item_vector = normalize_vector(ema_vars.mf_model["Q"][i_idx])
         affinity = float(np.dot(ema_vars.session_state, item_vector))
 
@@ -126,7 +127,7 @@ def run_user_session(
     session_logs = []
 
     for round_idx in range(1, config.EMA_ROUNDS + 1):
-        recommended = recommend_session_ltr(
+        ema_vars.recommended_items = recommend_session_ltr(
             config,
             general_vars,
             popularity_vars,
@@ -137,20 +138,6 @@ def run_user_session(
 
         chosen_item = simulate_user_choice(general_vars, ema_vars)
 
-        session_logs.append(
-            {
-                "round": round_idx,
-                "recommended_items": recommended,
-                "recommended_titles": general_vars.items[
-                    general_vars.items["item_id"].isin(recommended)
-                ]["title"].tolist(),
-                "chosen_item": chosen_item,
-                "chosen_title": general_vars.items.loc[
-                    general_vars.items["item_id"] == chosen_item, "title"
-                ].values[0],
-            }
-        )
-
         ema_vars.seen_in_session.add(chosen_item)
         ema_vars.session_state = ema_update_user_state(
             config,
@@ -159,8 +146,26 @@ def run_user_session(
             chosen_item,
         )
 
+        state_summary = np.round(ema_vars.session_state[:5], 4).tolist()
+
+        session_logs.append(
+            {
+                "round": round_idx,
+                "recommended_items": ema_vars.recommended_items,
+                "recommended_titles": general_vars.items[
+                    general_vars.items["item_id"].isin(ema_vars.recommended_items)
+                ]["title"].tolist(),
+                "chosen_item": chosen_item,
+                "chosen_title": general_vars.items.loc[
+                    general_vars.items["item_id"] == chosen_item, "title"
+                ].values[0],
+                "state_vector_head": state_summary,
+            }
+        )
+
     return {
         "user_id": int(user_id),
+        "mf_method": ema_vars.mf_method_name,
         "rho": config.EMA_RHO,
         "beta": config.EMA_BETA,
         "rounds": config.EMA_ROUNDS,
@@ -266,8 +271,10 @@ def compare_rho_values(
     ema_vars: EMA_Variables,
 ) -> None:
     session_results_rho_comparison = []
+    original_rho = config.EMA_RHO
 
     for rho_value in [0.1, 0.3]:
+        config.EMA_RHO = rho_value
         for user_id in ema_vars.session_users:
             session_result = run_user_session(
                 config,
@@ -279,4 +286,5 @@ def compare_rho_values(
             )
             session_results_rho_comparison.append(session_result)
 
+    config.EMA_RHO = original_rho
     print("Sessões rho comparison:", len(session_results_rho_comparison))

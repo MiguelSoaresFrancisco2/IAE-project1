@@ -12,11 +12,11 @@ def train_mf_sgd(
 
     mu = np.mean([rating for _, _, rating in general_vars.train_data])
 
-    P = rng.normal(0, 0.1, size=(general_vars.n_users, config.MF_SGD_DIM))
-    Q = rng.normal(0, 0.1, size=(general_vars.n_items, config.MF_SGD_DIM))
+    P = rng.normal(0, 0.1, size=(general_vars.index_map.n_users, config.MF_SGD_DIM))
+    Q = rng.normal(0, 0.1, size=(general_vars.index_map.n_items, config.MF_SGD_DIM))
 
-    bu = np.zeros(general_vars.n_users)
-    bi = np.zeros(general_vars.n_items)
+    bu = np.zeros(general_vars.index_map.n_users)
+    bi = np.zeros(general_vars.index_map.n_items)
 
     history = []
     train_data_shuffled = general_vars.train_data.copy()

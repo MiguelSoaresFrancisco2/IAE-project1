@@ -3,8 +3,14 @@ import pandas as pd
 from core.config import Config
 
 from core.metrics import cosine_similarity, diversity_at_k, ndcg_at_k, recall_at_k
-from core.structs import GeneralVariables, LTR_Variables, MF_Variables, PopularityVariables
-from core.utils import get_candidates
+from core.structs import (
+    GeneralVariables,
+    LTR_Variables,
+    MF_Variables,
+    PopularityVariables,
+    ResultBundle,
+)
+from core.candidates import get_candidates
 from rankers.mf_general import predict_mf
 from rankers.pairwise_ltr import predict_pairwise_ltr
 
@@ -24,7 +30,9 @@ def get_top_m_candidates(
         if popularity_vars is None:
             score = predict_func(general_vars, method_vars.model, user_id, item_id)
         else:
-            score = predict_func(general_vars, popularity_vars, method_vars, user_id, item_id)
+            score = predict_func(
+                config, general_vars, popularity_vars, method_vars, user_id, item_id
+            )
 
         scored_items[i] = (item_id, score)
 
@@ -55,7 +63,9 @@ def mmr_rerank(
     selected = []
     selected_ids = set()
 
-    while len(selected) < config.TOP_M and len(selected) < len(scored_candidates):
+    target_k = config.TOP_K
+
+    while len(selected) < target_k and len(selected) < len(scored_candidates):
         best_item = None
         best_mmr_score = -float("inf")
 
@@ -94,7 +104,6 @@ def print_mmr_example(
     method_vars: MF_Variables | LTR_Variables,
     user_id: int,
 ) -> None:
-    example_user = general_vars.eligible_users[user_id]
     top_m_mf = get_top_m_candidates(
         config,
         general_vars,
@@ -104,10 +113,11 @@ def print_mmr_example(
         popularity_vars=popularity_vars,
     )
 
-    print("User:", example_user)
+    print("User:", user_id)
     for alpha in config.MMR_ALPHA_VALUES:
         mmr_recs = mmr_rerank(config, general_vars, top_m_mf, alpha=alpha)
         print(f"{method_vars.method_name.upper()} + MMR alpha={alpha}:", mmr_recs)
+
 
 def evaluate_mmr(
     config: Config,
@@ -115,15 +125,17 @@ def evaluate_mmr(
     method_vars: MF_Variables | LTR_Variables,
     predict_func: callable,
     popularity_vars: PopularityVariables | None = None,
-) -> tuple[list, pd.DataFrame]:
-    
+) -> ResultBundle:
+
     mmr_results = []
 
     for alpha in config.MMR_ALPHA_VALUES:
         if config.PRINT_CONFIRM:
             print(f"Evaluating MMR with alpha={alpha} for method {method_vars.method_name}...")
         for user_id in general_vars.eligible_users:
-            top_m_candidates = get_top_m_candidates(config, general_vars, method_vars, user_id, predict_func, popularity_vars)
+            top_m_candidates = get_top_m_candidates(
+                config, general_vars, method_vars, user_id, predict_func, popularity_vars
+            )
             recommended = mmr_rerank(config, general_vars, top_m_candidates, alpha=alpha)
 
             relevant = general_vars.relevant_items_by_user[user_id]
@@ -132,20 +144,21 @@ def evaluate_mmr(
             ndcg = ndcg_at_k(recommended, relevant, k=config.TOP_K)
             diversity = diversity_at_k(recommended, general_vars.item_genre_vectors, k=config.TOP_K)
 
-            mmr_results.append({
-                "user_id": int(user_id),
-                "method": f"mmr_{method_vars.method_name}",
-                "alpha": alpha,
-                "top_k": recommended,
-                "recall@10": recall,
-                "ndcg@10": ndcg,
-                "diversity@10": diversity,
-            })
+            mmr_results.append(
+                {
+                    "user_id": int(user_id),
+                    "method": f"mmr_{method_vars.method_name}",
+                    "alpha": alpha,
+                    "top_k": recommended,
+                    "recall@10": recall,
+                    "ndcg@10": ndcg,
+                    "diversity@10": diversity,
+                }
+            )
 
-    mmr_results_df = pd.DataFrame(mmr_results)
+    result_bundle = ResultBundle.from_rows(mmr_results)
 
     if config.PRINT_CONFIRM:
-        print(mmr_results_df.head())
+        print(result_bundle.df.head())
 
-    return mmr_results, mmr_results_df
-
+    return result_bundle

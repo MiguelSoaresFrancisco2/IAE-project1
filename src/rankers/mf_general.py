@@ -1,47 +1,44 @@
 import numpy as np
 
 from core.config import Config
-from core.structs import GeneralVariables, MF_Variables
-from core.utils import get_candidates
+from core.structs import GeneralVariables, IndexMap, MF_Variables
+from core.candidates import get_candidates
 
 
-def prepare_md_data(config: Config, general_vars: GeneralVariables) -> tuple:
-    unique_user_ids = sorted(general_vars.ratings["user_id"].unique())
-    unique_item_ids = sorted(general_vars.ratings["item_id"].unique())
+def prepare_mf_data(config: Config, general_vars: GeneralVariables) -> IndexMap:
+    user_ids = sorted(general_vars.ratings["user_id"].unique())
+    item_ids = sorted(general_vars.ratings["item_id"].unique())
 
-    user_to_index = {user_id: idx for idx, user_id in enumerate(unique_user_ids)}
-    item_to_index = {item_id: idx for idx, item_id in enumerate(unique_item_ids)}
+    user_to_index = {user_id: idx for idx, user_id in enumerate(user_ids)}
+    item_to_index = {item_id: idx for idx, item_id in enumerate(item_ids)}
 
     index_to_user = {idx: user_id for user_id, idx in user_to_index.items()}
     index_to_item = {idx: item_id for item_id, idx in item_to_index.items()}
 
-    n_users = len(unique_user_ids)
-    n_items = len(unique_item_ids)
-
-    if config.PRINT_CONFIRM:
-        print("n_users =", n_users)
-        print("n_items =", n_items)
-
-    return (
-        unique_user_ids,
-        unique_item_ids,
-        user_to_index,
-        item_to_index,
-        index_to_user,
-        index_to_item,
-        n_users,
-        n_items,
+    index_map = IndexMap(
+        user_ids=user_ids,
+        item_ids=item_ids,
+        user_to_index=user_to_index,
+        item_to_index=item_to_index,
+        index_to_user=index_to_user,
+        index_to_item=index_to_item,
     )
 
+    if config.PRINT_CONFIRM:
+        print("n_users =", index_map.n_users)
+        print("n_items =", index_map.n_items)
 
-def get_md_data(
+    return index_map
+
+
+def get_data(
     config: Config,
     general_vars: GeneralVariables,
 ):
     train_data = [
         (
-            general_vars.user_to_index[row.user_id],
-            general_vars.item_to_index[row.item_id],
+            general_vars.index_map.user_to_index[row.user_id],
+            general_vars.index_map.item_to_index[row.item_id],
             float(row.rating),
         )
         for row in general_vars.train_df.itertuples(index=False)
@@ -49,8 +46,8 @@ def get_md_data(
 
     test_data = [
         (
-            general_vars.user_to_index[row.user_id],
-            general_vars.item_to_index[row.item_id],
+            general_vars.index_map.user_to_index[row.user_id],
+            general_vars.index_map.item_to_index[row.item_id],
             float(row.rating),
         )
         for row in general_vars.test_df.itertuples(index=False)
@@ -70,8 +67,8 @@ def predict_mf(
     user_id: int,
     item_id: int,
 ) -> float:
-    u_idx = general_vars.user_to_index[user_id]
-    i_idx = general_vars.item_to_index[item_id]
+    u_idx = general_vars.index_map.user_to_index[user_id]
+    i_idx = general_vars.index_map.item_to_index[item_id]
 
     pred = (
         model["mu"]
@@ -114,8 +111,8 @@ def compute_rmse(
     errors = [0.0] * len(data)
     i: int = 0
     for u_idx, i_idx, rating in data:
-        user_id = general_vars.index_to_user[u_idx]
-        item_id = general_vars.index_to_item[i_idx]
+        user_id = general_vars.index_map.index_to_user[u_idx]
+        item_id = general_vars.index_map.index_to_item[i_idx]
 
         pred = predict_mf(general_vars, model, user_id, item_id)
 

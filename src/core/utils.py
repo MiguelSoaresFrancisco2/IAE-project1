@@ -8,7 +8,20 @@ from sklearn.model_selection import train_test_split
 
 from core.config import Config
 from core.metrics import diversity_at_k, ndcg_at_k, recall_at_k
-from core.structs import GeneralVariables, LTR_Variables, MF_Variables, PopularityVariables
+from core.structs import (
+    GeneralVariables,
+    LTR_Variables,
+    MF_Variables,
+    PopularityVariables,
+    ResultBundle,
+)
+
+from rankers.mf_general import (
+    prepare_mf_data,
+    get_data,
+)
+
+from rankers.mf_als import prepare_mf_als_data
 
 
 def prepare_evaluation(
@@ -176,11 +189,6 @@ def get_genre_vectors(general_vars: GeneralVariables) -> dict[int, list[float]]:
     return item_genre_vectors
 
 
-def get_candidates(general_vars: GeneralVariables, user_id: int) -> list:
-    seen_items = general_vars.train_items_by_user.get(user_id, set())
-    return list(general_vars.all_items - seen_items)
-
-
 def get_eligible_users(config: Config, general_vars: GeneralVariables) -> list:
     eligible_users = [u for u in general_vars.all_users if u in general_vars.relevant_items_by_user]
 
@@ -193,6 +201,26 @@ def get_eligible_users(config: Config, general_vars: GeneralVariables) -> list:
     return eligible_users
 
 
+def setup_general_vars(config: Config, general_vars: GeneralVariables) -> GeneralVariables:
+    general_vars.ratings, general_vars.items = load_data(config)
+    general_vars.train_df, general_vars.test_df = get_train_test_split(config, general_vars)
+    (
+        general_vars.all_users,
+        general_vars.all_items,
+        general_vars.train_items_by_user,
+        general_vars.relevant_items_by_user,
+    ) = prepare_evaluation(config, general_vars)
+    general_vars.item_genre_vectors = get_genre_vectors(general_vars)
+    general_vars.eligible_users = get_eligible_users(config, general_vars)
+    general_vars.index_map = prepare_mf_data(config, general_vars)
+    general_vars.train_data, general_vars.test_data = get_data(config, general_vars)
+    general_vars.user_ratings_train, general_vars.item_ratings_train = prepare_mf_als_data(
+        general_vars
+    )
+
+    return general_vars
+
+
 def save_logs(
     config: Config,
     log_name: str,
@@ -203,8 +231,8 @@ def save_logs(
     os.makedirs("logs", exist_ok=True)
 
     with open(f"logs/{log_name}.jsonl", "w", encoding="utf-8") as f:
-        for row in results:
-            if not ema_logs:
+        if not ema_logs:
+            for row in results:
                 log_entry = {
                     "user_id": int(row["user_id"]),
                     "method": row["method"],
@@ -216,18 +244,24 @@ def save_logs(
                     },
                     "hyperparameters": hyperparameters,
                 }
-            else:
-                for log in results["logs"]:
+                if "alpha" in row:
+                    log_entry["alpha"] = float(row["alpha"])
+                f.write(json.dumps(log_entry) + "\n")
+        else:
+            for session in results:
+                method_name = session.get("mf_method") or "ema"
+                for log in session["logs"]:
                     log_entry = {
-                        "user_id": int(results["user_id"]),
+                        "user_id": int(session["user_id"]),
+                        "method": f"ema_{method_name}",
+                        "round": int(log["round"]),
                         "recommended_items": [int(x) for x in log["recommended_items"]],
                         "chosen_item": int(log["chosen_item"]),
                         "chosen_title": log["chosen_title"],
-                        "hyperparameters": hyperparameters
+                        "state_vector_head": [float(x) for x in log["state_vector_head"]],
+                        "hyperparameters": hyperparameters,
                     }
-                    
-            f.write(json.dumps(log_entry) + "\n")
-                
+                    f.write(json.dumps(log_entry) + "\n")
 
     print(f"File created: logs/{log_name}.jsonl")
 
@@ -253,8 +287,11 @@ def print_examples_recommendations(
 
     print("User:", user_id)
     print(f"Top-10 {model_vars.method_name.upper()} item ids:", example_recs_mf)
-
-    general_vars.items[general_vars.items["item_id"].isin(example_recs_mf)][["item_id", "title"]]
+    print(
+        general_vars.items[general_vars.items["item_id"].isin(example_recs_mf)][
+            ["item_id", "title"]
+        ]
+    )
 
 
 def evaluate_method(
@@ -263,7 +300,7 @@ def evaluate_method(
     method_vars: MF_Variables | LTR_Variables,
     recommend_func: callable,
     popularity_vars: PopularityVariables | None = None,
-) -> tuple[list, pd.DataFrame]:
+) -> ResultBundle:
     method_results = [{} for _ in range(len(general_vars.eligible_users))]
 
     for user_id in general_vars.eligible_users:
@@ -289,9 +326,38 @@ def evaluate_method(
             "diversity@10": diversity,
         }
 
-    method_results_df = pd.DataFrame(method_results)
+    result_bundle = ResultBundle.from_rows(method_results)
 
     if config.PRINT_CONFIRM:
-        print(method_results_df.head())
+        print(result_bundle.df.head())
 
-    return method_results, method_results_df
+    return result_bundle
+
+
+def setup_hyperparameters(
+    config: Config,
+    mf_sgd_vars: MF_Variables,
+    mf_als_vars: MF_Variables,
+    pairwise_ltr_vars: LTR_Variables,
+) -> None:
+    mf_sgd_vars.hyperparameters = {
+        "k": config.TOP_K,
+        "d": config.MF_SGD_DIM,
+        "lr": config.MF_SGD_LR,
+        "reg": config.MF_SGD_REG,
+        "epochs": config.MF_SGD_EPOCHS,
+    }
+    mf_als_vars.hyperparameters = {
+        "k": config.TOP_K,
+        "d": config.MF_ALS_DIM,
+        "reg": config.MF_ALS_REG,
+        "iters": config.MF_ALS_ITERS,
+    }
+    pairwise_ltr_vars.hyperparameters = {
+        "k": config.TOP_K,
+        "epochs": config.LTR_EPOCHS,
+        "lr": config.LTR_LR,
+        "reg": config.LTR_REG,
+        "max_pairs_per_user": config.LTR_MAX_PAIRS_PER_USER,
+        "use_popularity": config.LTR_USE_POPULARITY,
+    }

@@ -2,7 +2,7 @@ import numpy as np
 
 from core.config import Config
 from core.structs import GeneralVariables, LTR_Variables, PopularityVariables
-from core.utils import get_candidates
+from core.candidates import get_candidates
 from rankers.mf_general import predict_mf
 
 
@@ -11,19 +11,20 @@ def sigmoid(x: float) -> float:
 
 
 def build_ltr_feature_vector(
+    config: Config,
     general_vars: GeneralVariables,
     popularity_vars: PopularityVariables,
     mf_model: dict,
     user_id: int,
     item_id: int,
 ) -> np.ndarray:
-    u_idx = general_vars.user_to_index[user_id]
-    i_idx = general_vars.item_to_index[item_id]
+    u_idx = general_vars.index_map.user_to_index[user_id]
+    i_idx = general_vars.index_map.item_to_index[item_id]
 
     s_mf = predict_mf(general_vars, mf_model, user_id, item_id)
     bu_val = float(mf_model["bu"][u_idx])
     bi_val = float(mf_model["bi"][i_idx])
-    pop_val = float(popularity_vars.item_popularity.get(item_id, 0))
+    pop_val = float(popularity_vars.item_popularity.get(item_id, 0)) if config.LTR_USE_POPULARITY else 0.0
 
     return np.array([s_mf, bu_val, bi_val, pop_val, 1.0], dtype=float)
 
@@ -87,10 +88,20 @@ def train_pairwise_ltr(
 
         for user_id, i_pos, i_neg in train_data:
             f_pos = build_ltr_feature_vector(
-                general_vars, popularity_vars, mf_model, user_id, i_pos
+                config,
+                general_vars,
+                popularity_vars,
+                mf_model,
+                user_id,
+                i_pos,
             )
             f_neg = build_ltr_feature_vector(
-                general_vars, popularity_vars, mf_model, user_id, i_neg
+                config,
+                general_vars,
+                popularity_vars,
+                mf_model,
+                user_id,
+                i_neg,
             )
 
             delta_f = f_pos - f_neg
@@ -113,17 +124,26 @@ def train_pairwise_ltr(
         "phi": phi,
         "history": history,
         "params": {"epochs": config.LTR_EPOCHS, "lr": config.LTR_LR, "reg": config.LTR_REG},
+        "use_popularity": config.LTR_USE_POPULARITY,
     }
 
 
 def predict_pairwise_ltr(
+    config: Config,
     general_vars: GeneralVariables,
     popularity_vars: PopularityVariables,
     ltr_vars: LTR_Variables,
     user_id: int,
     item_id: int,
 ) -> float:
-    features = build_ltr_feature_vector(general_vars, popularity_vars, ltr_vars.mf_model, user_id, item_id)
+    features = build_ltr_feature_vector(
+        config,
+        general_vars,
+        popularity_vars,
+        ltr_vars.mf_model,
+        user_id,
+        item_id,
+    )
     score = np.dot(ltr_vars.model["phi"], features)
     return float(score)
 
@@ -139,7 +159,7 @@ def recommend_pairwise_ltr(
 
     scored_items = []
     for item_id in candidates:
-        score = predict_pairwise_ltr(general_vars, popularity_vars, ltr_vars, user_id, item_id)
+        score = predict_pairwise_ltr(config, general_vars, popularity_vars, ltr_vars, user_id, item_id)
         scored_items.append((item_id, score))
 
     ranked_items = sorted(scored_items, key=lambda x: x[1], reverse=True)

@@ -6,7 +6,7 @@ from core.config import Config
 from core.structs import GeneralVariables
 
 
-def prepare_MF_ALS_DIMata(general_vars: GeneralVariables) -> tuple[defaultdict, defaultdict]:
+def prepare_mf_als_data(general_vars: GeneralVariables) -> tuple[defaultdict, defaultdict]:
     user_ratings_train = defaultdict(list)
     item_ratings_train = defaultdict(list)
 
@@ -28,11 +28,11 @@ def train_mf_als(
 
     mu = np.mean([rating for _, _, rating in general_vars.train_data])
 
-    P = rng.normal(0, 0.1, size=(general_vars.n_users, config.MF_ALS_DIM))
-    Q = rng.normal(0, 0.1, size=(general_vars.n_items, config.MF_ALS_DIM))
+    P = rng.normal(0, 0.1, size=(general_vars.index_map.n_users, config.MF_ALS_DIM))
+    Q = rng.normal(0, 0.1, size=(general_vars.index_map.n_items, config.MF_ALS_DIM))
 
-    bu = np.zeros(general_vars.n_users)
-    bi = np.zeros(general_vars.n_items)
+    bu = np.zeros(general_vars.index_map.n_users)
+    bi = np.zeros(general_vars.index_map.n_items)
 
     history = []
 
@@ -40,7 +40,7 @@ def train_mf_als(
 
     for iteration in range(config.MF_ALS_ITERS):
         # Update user factors P
-        for u_idx in range(general_vars.n_users):
+        for u_idx in range(general_vars.index_map.n_users):
             ratings_u = general_vars.user_ratings_train.get(u_idx, [])
             if not ratings_u:
                 continue
@@ -57,7 +57,7 @@ def train_mf_als(
             P[u_idx] = np.linalg.solve(A, b_vec)
 
         # Update item factors Q
-        for i_idx in range(general_vars.n_items):
+        for i_idx in range(general_vars.index_map.n_items):
             ratings_i = general_vars.item_ratings_train.get(i_idx, [])
             if not ratings_i:
                 continue
@@ -74,7 +74,7 @@ def train_mf_als(
             Q[i_idx] = np.linalg.solve(A, b_vec)
 
         # Update user biases
-        for u_idx in range(general_vars.n_users):
+        for u_idx in range(general_vars.index_map.n_users):
             ratings_u = general_vars.user_ratings_train.get(u_idx, [])
             if not ratings_u:
                 continue
@@ -90,7 +90,7 @@ def train_mf_als(
             bu[u_idx] = numerator / denominator
 
         # Update item biases
-        for i_idx in range(general_vars.n_items):
+        for i_idx in range(general_vars.index_map.n_items):
             ratings_i = general_vars.item_ratings_train.get(i_idx, [])
             if not ratings_i:
                 continue

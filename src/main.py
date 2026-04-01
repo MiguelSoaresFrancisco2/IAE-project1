@@ -10,20 +10,16 @@ from core.structs import (
 
 from core.utils import (
     plot_mmr_tradeoff,
-    prepare_evaluation,
     plot_training_history,
     compare_methods,
-    get_eligible_users,
-    load_data,
-    get_train_test_split,
-    get_genre_vectors,
     print_examples_recommendations,
     save_logs,
     evaluate_method,
+    setup_general_vars,
+    setup_hyperparameters,
 )
 
 from personalization.ema import (
-    compare_rho_values,
     get_session_recommendations,
     get_session_results,
     get_session_summary_df,
@@ -42,38 +38,48 @@ from rankers.popularity import (
 )
 from rankers.mf_general import (
     predict_mf,
-    prepare_md_data,
-    get_md_data,
     print_rmse,
     recommend_mf,
 )
-from rankers.mf_sgd import (
-    train_mf_sgd,
-)
-from rankers.mf_als import (
-    prepare_MF_ALS_DIMata,
-    train_mf_als,
-)
+from rankers.mf_sgd import train_mf_sgd
+from rankers.mf_als import train_mf_als
 from reranker.mmr import evaluate_mmr, print_mmr_example
 
 
 if __name__ == "__main__":
+    #######################################################################
+    #                   CREATION AND SETUP OF VARIABLES                   #
+    #######################################################################
+
+    # Set up configuration and random seed
     config = Config()
-    general_vars = GeneralVariables()
     config.set_seed()
 
-    # Load data and prepare evaluation
-    general_vars.ratings, general_vars.items = load_data(config)
-    general_vars.train_df, general_vars.test_df = get_train_test_split(config, general_vars)
-    (
-        general_vars.all_users,
-        general_vars.all_items,
-        general_vars.train_items_by_user,
-        general_vars.relevant_items_by_user,
-    ) = prepare_evaluation(config, general_vars)
+    # Initialize variable containers
+    general_vars = GeneralVariables()
+    popularity_vars = PopularityVariables()
+    mf_sgd_vars = MF_Variables("mf_sgd")
+    mf_als_vars = MF_Variables("mf_als")
+    pairwise_ltr_vars = LTR_Variables("pairwise_ltr")
 
-    # Get genre vectors for diversity calculation
-    general_vars.item_genre_vectors = get_genre_vectors(general_vars)
+    # Data setup: load, split, evaluation caches, genre vectors, eligible users, etc.
+    general_vars = setup_general_vars(config, general_vars)
+
+    # Calculate item popularity
+    popularity_vars.item_popularity = get_item_popularity(general_vars)
+
+    # Example user for printing recommendations later
+    example_user_id = general_vars.eligible_users[0] if general_vars.eligible_users else None
+
+    # Set up hyperparameters for all methods
+    setup_hyperparameters(config, mf_sgd_vars, mf_als_vars, pairwise_ltr_vars)
+
+    # Store method variables in a dictionary for easier access during training and evaluation
+    method_vars: dict[str, MF_Variables | LTR_Variables] = {
+        "mf_sgd": mf_sgd_vars,
+        "mf_als": mf_als_vars,
+        "pairwise_ltr": pairwise_ltr_vars,
+    }
 
     #
     #
@@ -81,82 +87,21 @@ if __name__ == "__main__":
     #                     POPULARITY-BASED RECOMMENDER                    #
     #######################################################################
 
-    popularity_vars = PopularityVariables()
-
-    # Calculate item popularity
-    popularity_vars.item_popularity = get_item_popularity(general_vars)
-
-    general_vars.eligible_users = get_eligible_users(config, general_vars)
-
     # Evaluate popularity-based recommender
-    popularity_vars.results, popularity_vars.results_df = evaluate_popularity(
-        config, general_vars, popularity_vars
-    )
+    popularity_vars.results = evaluate_popularity(config, general_vars, popularity_vars)
 
     if config.PRINT_CONFIRM:
-        print(popularity_vars.results_df[["recall@10", "ndcg@10", "diversity@10"]].mean())
-        print_examples_popularity(
-            config,
-            general_vars,
-            popularity_vars,
-            0,  # example user index
-        )
+        print(popularity_vars.results.df[["recall@10", "ndcg@10", "diversity@10"]].mean())
+        if example_user_id is not None:
+            print_examples_popularity(config, general_vars, popularity_vars, example_user_id)
 
-    save_logs(config, "popularity_eval", popularity_vars.results, {"k": config.TOP_K})
+    save_logs(config, "popularity_eval", popularity_vars.results.rows, {"k": config.TOP_K})
 
     #
     #
     #######################################################################
     # MATRIX FACTORIZATION WITH SGD AND ALS AND PAIRWISE LTR RECOMMENDERS #
     #######################################################################
-
-    mf_sgd_vars = MF_Variables("mf_sgd")
-    mf_als_vars = MF_Variables("mf_als")
-    pairwise_ltr_vars = LTR_Variables("pairwise_ltr")
-
-    mf_sgd_vars.hyperparameters = {
-        "k": config.TOP_K,
-        "d": config.MF_SGD_DIM,
-        "lr": config.MF_SGD_LR,
-        "reg": config.MF_SGD_REG,
-        "epochs": config.MF_SGD_EPOCHS,
-    }
-    mf_als_vars.hyperparameters = {
-        "k": config.TOP_K,
-        "d": config.MF_ALS_DIM,
-        "reg": config.MF_ALS_REG,
-        "iters": config.MF_ALS_ITERS,
-    }
-    pairwise_ltr_vars.hyperparameters = {
-        "k": config.TOP_K,
-        "epochs": config.LTR_EPOCHS,
-        "lr": config.LTR_LR,
-        "reg": config.LTR_REG,
-        "max_pairs_per_user": config.LTR_MAX_PAIRS_PER_USER,
-    }
-
-    method_vars: dict[str, MF_Variables | LTR_Variables] = {
-        "mf_sgd": mf_sgd_vars,
-        "mf_als": mf_als_vars,
-        "pairwise_ltr": pairwise_ltr_vars,
-    }
-
-    (
-        general_vars.unique_user_ids,
-        general_vars.unique_item_ids,
-        general_vars.user_to_index,
-        general_vars.item_to_index,
-        general_vars.index_to_user,
-        general_vars.index_to_item,
-        general_vars.n_users,
-        general_vars.n_items,
-    ) = prepare_md_data(config, general_vars)
-
-    general_vars.train_data, general_vars.test_data = get_md_data(config, general_vars)
-
-    general_vars.user_ratings_train, general_vars.item_ratings_train = prepare_MF_ALS_DIMata(
-        general_vars
-    )
 
     for method in config.METHODS:
         print(f"Training {method.upper()}...")
@@ -197,6 +142,7 @@ if __name__ == "__main__":
             )
 
         if config.SHOW_PLOTS or config.SAVE_IMAGES:
+            y_label = "Loss" if method == "pairwise_ltr" else "Train RMSE"
             plot_training_history(
                 config,
                 method_vars[method].model["history"],
@@ -204,11 +150,11 @@ if __name__ == "__main__":
                 if method != "pairwise_ltr"
                 else "Pairwise LTR Training Loss",
                 xlabel="Epoch" if method != "mf_als" else "Iteration",
-                ylabel="Train RMSE",
+                ylabel=y_label,
                 img_name=f"{method}_training_{'rmse' if method != 'pairwise_ltr' else 'loss'}.png",
             )
 
-        method_vars[method].results, method_vars[method].results_df = evaluate_method(
+        method_vars[method].results = evaluate_method(
             config,
             general_vars,
             method_vars[method],
@@ -223,24 +169,24 @@ if __name__ == "__main__":
                 general_vars,
                 method_vars[method],
                 recommend_func=recommend_mf if method != "pairwise_ltr" else recommend_pairwise_ltr,
-                user_id=1,  # example user index
+                user_id=example_user_id if example_user_id is not None else 1,
                 popularity_vars=popularity_vars if method == "pairwise_ltr" else None,
             )
-            print(method_vars[method].results_df[["recall@10", "ndcg@10", "diversity@10"]].mean())
+            print(method_vars[method].results.df[["recall@10", "ndcg@10", "diversity@10"]].mean())
             if method != "pairwise_ltr":
                 print_rmse(general_vars, method_vars[method].model)
 
         if config.COMPARE_METHODS:
-            dfs_to_compare = [popularity_vars.results_df] + [
-                method_vars[m].results_df for m in general_vars.done_methods_names
+            dfs_to_compare = [popularity_vars.results.df] + [
+                method_vars[m].results.df for m in general_vars.done_methods_names
             ]
-            names_to_compare = [m for m in general_vars.done_methods_names]
+            names_to_compare = ["popularity"] + [m for m in general_vars.done_methods_names]
             compare_methods(dfs_to_compare, names_to_compare)
 
         save_logs(
             config,
             f"{method}_eval",
-            method_vars[method].results,
+            method_vars[method].results.rows,
             method_vars[method].hyperparameters,
         )
 
@@ -270,10 +216,10 @@ if __name__ == "__main__":
                     general_vars,
                     popularity_vars if method == "pairwise_ltr" else None,
                     method_vars[method],
-                    user_id=1,  # example user index
+                    user_id=example_user_id if example_user_id is not None else 1,
                 )
 
-            mmr_vars.results, mmr_vars.results_df = evaluate_mmr(
+            mmr_vars.results = evaluate_mmr(
                 config,
                 general_vars,
                 method_vars[method],
@@ -282,7 +228,7 @@ if __name__ == "__main__":
             )
 
             mmr_summary_df = (
-                mmr_vars.results_df.groupby("alpha")[["recall@10", "ndcg@10", "diversity@10"]]
+                mmr_vars.results.df.groupby("alpha")[["recall@10", "ndcg@10", "diversity@10"]]
                 .mean()
                 .reset_index()
             )
@@ -301,7 +247,7 @@ if __name__ == "__main__":
             save_logs(
                 config,
                 f"mmr_{method}_eval",
-                mmr_vars.results,
+                mmr_vars.results.rows,
                 mmr_vars.hyperparameters,
             )
 
@@ -325,6 +271,7 @@ if __name__ == "__main__":
             print(f"\nRunning EMA with {method.upper()} as base MF model...")
 
             ema_vars.mf_model = method_vars[method].model
+            ema_vars.mf_method_name = method
 
             ema_vars.session_results = get_session_results(
                 config,
@@ -336,9 +283,6 @@ if __name__ == "__main__":
 
             ema_vars.session_summary_df = get_session_summary_df(
                 config,
-                general_vars,
-                popularity_vars,
-                pairwise_ltr_vars,
                 ema_vars,
             )
 
@@ -358,4 +302,5 @@ if __name__ == "__main__":
                     "rounds": config.EMA_ROUNDS,
                     "k": config.TOP_K,
                 },
+                ema_logs=True,
             )
