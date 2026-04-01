@@ -1,4 +1,6 @@
 import pandas as pd
+import numpy as np
+
 from collections import defaultdict
 
 
@@ -83,3 +85,17 @@ class MMR_Variables:
     results_df: pd.DataFrame = None
 
     hyperparameters: dict = None
+
+
+class EMA_Variables:
+    session_users: list[int] = None
+    session_state: np.ndarray = None
+    seen_in_session: set = None
+    
+    mf_model: dict = None
+    recommended_items: list[int] = None
+    
+    session_results: list = None
+    session_summary_df: pd.DataFrame = None
+    session_recommendations_df: pd.DataFrame = None
+

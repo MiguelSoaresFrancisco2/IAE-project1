@@ -198,23 +198,36 @@ def save_logs(
     log_name: str,
     results: list[dict],
     hyperparameters: dict,
+    ema_logs: bool = False,
 ) -> None:
     os.makedirs("logs", exist_ok=True)
 
     with open(f"logs/{log_name}.jsonl", "w", encoding="utf-8") as f:
         for row in results:
-            log_entry = {
-                "user_id": int(row["user_id"]),
-                "method": row["method"],
-                "top_k": [int(x) for x in row["top_k"]],
-                "metrics": {
-                    "recall@10": None if row["recall@10"] is None else float(row["recall@10"]),
-                    "ndcg@10": None if row["ndcg@10"] is None else float(row["ndcg@10"]),
-                    "diversity@10": float(row["diversity@10"]),
-                },
-                "hyperparameters": hyperparameters,
-            }
+            if not ema_logs:
+                log_entry = {
+                    "user_id": int(row["user_id"]),
+                    "method": row["method"],
+                    "top_k": [int(x) for x in row["top_k"]],
+                    "metrics": {
+                        "recall@10": None if row["recall@10"] is None else float(row["recall@10"]),
+                        "ndcg@10": None if row["ndcg@10"] is None else float(row["ndcg@10"]),
+                        "diversity@10": float(row["diversity@10"]),
+                    },
+                    "hyperparameters": hyperparameters,
+                }
+            else:
+                for log in results["logs"]:
+                    log_entry = {
+                        "user_id": int(results["user_id"]),
+                        "recommended_items": [int(x) for x in log["recommended_items"]],
+                        "chosen_item": int(log["chosen_item"]),
+                        "chosen_title": log["chosen_title"],
+                        "hyperparameters": hyperparameters
+                    }
+                    
             f.write(json.dumps(log_entry) + "\n")
+                
 
     print(f"File created: logs/{log_name}.jsonl")
 

@@ -35,6 +35,12 @@ class Config:
     MMR_ALPHA_VALUES: list[float] = [0.1, 0.4, 0.7]
     METHODS_TO_APPLY_MMR: list[str] = ["mf_sgd", "mf_als", "pairwise_ltr"]  # or just a subset
 
+    EMA_MF_METHODS: list[str] = ["mf_sgd", "mf_als"]  # or just a subset
+    EMA_RHO: float = 0.1
+    EMA_BETA: float = 0.3
+    EMA_ROUNDS: int = 5
+
+
     def __init__(self):
         if Config.FAST_MODE:
             self.MAX_USERS_EVAL = 300

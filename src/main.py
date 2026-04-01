@@ -1,5 +1,8 @@
+from turtle import pd
+
 from core.config import Config
 from core.structs import (
+    EMA_Variables,
     GeneralVariables,
     LTR_Variables,
     MF_Variables,
@@ -21,6 +24,14 @@ from core.utils import (
     evaluate_method,
 )
 
+from personalization.ema import (
+    compare_rho_values,
+    get_session_recommendations,
+    get_session_results,
+    get_session_summary_df,
+    print_session_summary,
+    run_user_session,
+)
 from rankers.pairwise_ltr import (
     build_pairwise_training_data,
     predict_pairwise_ltr,
@@ -297,3 +308,61 @@ if __name__ == "__main__":
                 mmr_vars.results,
                 mmr_vars.hyperparameters,
             )
+
+    #
+    #
+    #######################################################################
+    # EMA  #
+    #######################################################################
+
+    ema_vars = EMA_Variables()
+    if any(m not in general_vars.done_methods_names for m in config.EMA_MF_METHODS):
+        print("Error: All methods in EMA_MF_METHODS must be trained before running EMA.")
+
+    else:
+        ema_vars.session_users = general_vars.eligible_users[:3]
+
+        if config.PRINT_CONFIRM:
+            print(ema_vars.session_users)
+
+        for method in config.EMA_MF_METHODS:
+            print(f"\nRunning EMA with {method.upper()} as base MF model...")
+
+            ema_vars.mf_model = method_vars[method].model
+
+            ema_vars.session_results = get_session_results(
+                config,
+                general_vars,
+                popularity_vars,
+                pairwise_ltr_vars,
+                ema_vars,
+            )
+
+            ema_vars.session_summary_df = get_session_summary_df(
+                config,
+                general_vars,
+                popularity_vars,
+                pairwise_ltr_vars,
+                ema_vars,
+            )
+
+            ema_vars.session_recommendations_df = get_session_recommendations(
+                config,
+                ema_vars,
+            )
+
+            save_logs(
+                config,
+                f"ema_{method}_session_eval",
+                ema_vars.session_results,
+                {
+                    "mf_method": method,
+                    "rho": config.EMA_RHO,
+                    "beta": config.EMA_BETA,
+                    "rounds": config.EMA_ROUNDS,
+                    "k": config.TOP_K,
+                },
+            )
+            
+            compare_rho_values()
+            
