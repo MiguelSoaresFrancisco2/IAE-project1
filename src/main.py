@@ -1,5 +1,3 @@
-from turtle import pd
-
 from core.config import Config
 from core.structs import (
     EMA_Variables,
@@ -29,8 +27,6 @@ from personalization.ema import (
     get_session_recommendations,
     get_session_results,
     get_session_summary_df,
-    print_session_summary,
-    run_user_session,
 )
 from rankers.pairwise_ltr import (
     build_pairwise_training_data,
@@ -363,6 +359,3 @@ if __name__ == "__main__":
                     "k": config.TOP_K,
                 },
             )
-            
-            compare_rho_values()
-            
