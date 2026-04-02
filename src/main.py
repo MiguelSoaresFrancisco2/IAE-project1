@@ -1,3 +1,4 @@
+import os
 from core.config import Config
 from core.structs import (
     EMA_Variables,
@@ -10,13 +11,12 @@ from core.structs import (
 
 from core.utils import (
     plot_mmr_tradeoff,
-    plot_training_history,
     compare_methods,
-    print_examples_recommendations,
     save_logs,
     evaluate_method,
     setup_general_vars,
     setup_hyperparameters,
+    train_method,
 )
 
 from personalization.ema import (
@@ -27,9 +27,6 @@ from personalization.ema import (
 from rankers.pairwise_ltr import (
     build_pairwise_training_data,
     predict_pairwise_ltr,
-    print_examples_pairwise_ltr,
-    recommend_pairwise_ltr,
-    train_pairwise_ltr,
 )
 from rankers.popularity import (
     evaluate_popularity,
@@ -38,11 +35,7 @@ from rankers.popularity import (
 )
 from rankers.mf_general import (
     predict_mf,
-    print_rmse,
-    recommend_mf,
 )
-from rankers.mf_sgd import train_mf_sgd
-from rankers.mf_als import train_mf_als
 from reranker.mmr import evaluate_mmr, print_mmr_example
 
 
@@ -50,10 +43,17 @@ if __name__ == "__main__":
     #######################################################################
     #                   CREATION AND SETUP OF VARIABLES                   #
     #######################################################################
+    
+    print("==================================================")
+    print("Setting up variables and data...")
+    print("==================================================\n")
 
     # Set up configuration and random seed
     config = Config()
     config.set_seed()
+    
+    # Creating the logs directory if it doesn't exist
+    os.makedirs("logs", exist_ok=True)
 
     # Initialize variable containers
     general_vars = GeneralVariables()
@@ -74,8 +74,11 @@ if __name__ == "__main__":
     # Set up hyperparameters for all methods
     setup_hyperparameters(config, mf_sgd_vars, mf_als_vars, pairwise_ltr_vars)
 
+    # Building pairwise training data for LTR
+    pairwise_ltr_vars.train_data = build_pairwise_training_data(config, general_vars)
+
     # Store method variables in a dictionary for easier access during training and evaluation
-    method_vars: dict[str, MF_Variables | LTR_Variables] = {
+    methods_vars: dict[str, MF_Variables | LTR_Variables] = {
         "mf_sgd": mf_sgd_vars,
         "mf_als": mf_als_vars,
         "pairwise_ltr": pairwise_ltr_vars,
@@ -87,107 +90,66 @@ if __name__ == "__main__":
     #                     POPULARITY-BASED RECOMMENDER                    #
     #######################################################################
 
+    print("\n\n==================================================")
+    print("Evaluating popularity-based recommender...")
+    print("==================================================\n")
+
     # Evaluate popularity-based recommender
     popularity_vars.results = evaluate_popularity(config, general_vars, popularity_vars)
 
-    if config.PRINT_CONFIRM:
-        print(popularity_vars.results.df[["recall@10", "ndcg@10", "diversity@10"]].mean())
-        if example_user_id is not None:
-            print_examples_popularity(config, general_vars, popularity_vars, example_user_id)
+    # Print example recommendations for the example user
+    if config.PRINT_CONFIRM and example_user_id is not None:
+        print_examples_popularity(config, general_vars, popularity_vars, example_user_id)
 
-    save_logs(config, "popularity_eval", popularity_vars.results.rows, {"k": config.TOP_K})
+    # Saving logs for popularity-based recommender evaluation in a JSONL file
+    save_logs(
+        config,
+        general_vars,
+        "popularity_eval",
+        popularity_vars.results.rows,
+        {"k": config.TOP_K},
+    )
 
     #
     #
     #######################################################################
     # MATRIX FACTORIZATION WITH SGD AND ALS AND PAIRWISE LTR RECOMMENDERS #
     #######################################################################
+    
+    print("\n\n==================================================")
+    print("Training and evaluating MF and LTR recommenders...")
+    print("==================================================")
 
+    # Train, evaluate, compare, and save logs for MF and LTR methods
     for method in config.METHODS:
-        print(f"Training {method.upper()}...")
+        print(f"\n====== Training {method.upper()}... ======\n")
 
-        if method == "mf_sgd":
-            method_vars[method].model = train_mf_sgd(config, general_vars)
-        elif method == "mf_als":
-            method_vars[method].model = train_mf_als(config, general_vars)
-        elif method == "pairwise_ltr":
-            error = False
-            if config.LTR_MF_METHOD not in config.METHODS:
-                print(
-                    f"Error: LTR_MF_METHOD '{config.LTR_MF_METHOD}' must be in METHODS for pairwise LTR."
-                )
-                error = True
-            elif config.LTR_MF_METHOD not in general_vars.done_methods_names:
-                print(
-                    f"Error: LTR_MF_METHOD '{config.LTR_MF_METHOD}' must be trained before pairwise LTR."
-                )
-                error = True
-            else:
-                pairwise_ltr_vars.mf_model = method_vars[config.LTR_MF_METHOD].model
-
-            if error:
-                print("Skipping pairwise LTR training due to configuration issues.")
-                continue
-
-            method_vars[method].train_data = build_pairwise_training_data(config, general_vars)
-            if config.PRINT_CONFIRM:
-                print_examples_pairwise_ltr(method_vars[method].train_data)
-
-            pairwise_ltr_vars.model = train_pairwise_ltr(
-                config,
-                general_vars,
-                popularity_vars,
-                pairwise_ltr_vars,
-                method_vars[config.LTR_MF_METHOD].model,
-            )
-
-        if config.SHOW_PLOTS or config.SAVE_IMAGES:
-            y_label = "Loss" if method == "pairwise_ltr" else "Train RMSE"
-            plot_training_history(
-                config,
-                method_vars[method].model["history"],
-                title=f"MF-{method.upper()} Training RMSE"
-                if method != "pairwise_ltr"
-                else "Pairwise LTR Training Loss",
-                xlabel="Epoch" if method != "mf_als" else "Iteration",
-                ylabel=y_label,
-                img_name=f"{method}_training_{'rmse' if method != 'pairwise_ltr' else 'loss'}.png",
-            )
-
-        method_vars[method].results = evaluate_method(
-            config,
-            general_vars,
-            method_vars[method],
-            recommend_func=recommend_mf if method != "pairwise_ltr" else recommend_pairwise_ltr,
-            popularity_vars=popularity_vars if method == "pairwise_ltr" else None,
+        # Train the method and store the model and training history
+        methods_vars[method].model = train_method(
+            config, general_vars, popularity_vars, methods_vars, method
         )
+        if methods_vars[method].model is None:
+            continue
+
+        # Evaluate the method and store the results
+        methods_vars[method].results = evaluate_method(
+            config, general_vars, methods_vars[method], popularity_vars, example_user_id
+        )
+
+        # Mark this method as done for comparisons and MMR application
         general_vars.done_methods_names.add(method)
 
-        if config.PRINT_CONFIRM:
-            print_examples_recommendations(
-                config,
-                general_vars,
-                method_vars[method],
-                recommend_func=recommend_mf if method != "pairwise_ltr" else recommend_pairwise_ltr,
-                user_id=example_user_id if example_user_id is not None else 1,
-                popularity_vars=popularity_vars if method == "pairwise_ltr" else None,
-            )
-            print(method_vars[method].results.df[["recall@10", "ndcg@10", "diversity@10"]].mean())
-            if method != "pairwise_ltr":
-                print_rmse(general_vars, method_vars[method].model)
-
+        # Compare methods (compare all methods trained so far)
         if config.COMPARE_METHODS:
-            dfs_to_compare = [popularity_vars.results.df] + [
-                method_vars[m].results.df for m in general_vars.done_methods_names
-            ]
-            names_to_compare = ["popularity"] + [m for m in general_vars.done_methods_names]
-            compare_methods(dfs_to_compare, names_to_compare)
+            compare_methods(general_vars, popularity_vars, methods_vars)
 
+        # Save logs for this method's evaluation in a JSONL file
         save_logs(
             config,
+            general_vars,
             f"{method}_eval",
-            method_vars[method].results.rows,
-            method_vars[method].hyperparameters,
+            methods_vars[method].results.rows,
+            methods_vars[method].hyperparameters,
         )
 
     #
@@ -215,14 +177,14 @@ if __name__ == "__main__":
                     config,
                     general_vars,
                     popularity_vars if method == "pairwise_ltr" else None,
-                    method_vars[method],
+                    methods_vars[method],
                     user_id=example_user_id if example_user_id is not None else 1,
                 )
 
             mmr_vars.results = evaluate_mmr(
                 config,
                 general_vars,
-                method_vars[method],
+                methods_vars[method],
                 predict_func=predict_mf if method != "pairwise_ltr" else predict_pairwise_ltr,
                 popularity_vars=popularity_vars if method == "pairwise_ltr" else None,
             )
@@ -246,6 +208,7 @@ if __name__ == "__main__":
             mmr_vars.hyperparameters["base_ranker"] = method
             save_logs(
                 config,
+                general_vars,
                 f"mmr_{method}_eval",
                 mmr_vars.results.rows,
                 mmr_vars.hyperparameters,
@@ -270,7 +233,7 @@ if __name__ == "__main__":
         for method in config.EMA_MF_METHODS:
             print(f"\nRunning EMA with {method.upper()} as base MF model...")
 
-            ema_vars.mf_model = method_vars[method].model
+            ema_vars.mf_model = methods_vars[method].model
             ema_vars.mf_method_name = method
 
             ema_vars.session_results = get_session_results(
@@ -293,6 +256,7 @@ if __name__ == "__main__":
 
             save_logs(
                 config,
+                general_vars,
                 f"ema_{method}_session_eval",
                 ema_vars.session_results,
                 {

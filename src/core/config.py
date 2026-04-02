@@ -7,6 +7,8 @@ class Config:
     SAVE_IMAGES: bool = True
     SHOW_PLOTS: bool = False
     PRINT_CONFIRM: bool = True
+    ADVANCED_PRINT_MODE: bool = False
+    TEST_SIZE: float = 0.2
 
     COMPARE_METHODS: bool = True
     METHODS: list[str] = ["mf_sgd", "mf_als", "pairwise_ltr"]

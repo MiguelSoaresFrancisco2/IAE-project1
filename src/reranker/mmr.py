@@ -1,5 +1,3 @@
-import pandas as pd
-
 from core.config import Config
 
 from core.metrics import cosine_similarity, diversity_at_k, ndcg_at_k, recall_at_k
