@@ -14,6 +14,7 @@ from core.structs import (
     MF_Variables,
     PopularityVariables,
     ResultBundle,
+    MMR_Variables,
 )
 
 from rankers.mf_general import (
@@ -35,14 +36,14 @@ def prepare_evaluation(
     config: Config,
     general_vars: GeneralVariables,
 ) -> tuple[list, set, dict, dict]:
-    '''
+    """
     Prepares variables needed for evaluation:
     - all_users: list of all user ids
     - all_items: set of all item ids
     - train_items_by_user: dict mapping user_id to set of item_ids in their training
     - relevant_items_by_user: dict mapping user_id to set of relevant item_ids in test (rating >= 4)
-    '''
-    
+    """
+
     # Filtered test dataframe containing only relevant items (rating >= 4)
     test_relevant = general_vars.test_df[general_vars.test_df["rating"] >= 4].copy()
 
@@ -73,10 +74,10 @@ def plot_training_history(
     figsize: tuple = (8, 4),
     marker: str = "o",
 ):
-    '''
+    """
     Plots the training history (RMSE for MF methods, loss for LTR) with appropriate titles and labels.
     Saves the plot as an image if SAVE_IMAGES is True and shows it if SHOW_PLOTS is True.
-    
+
     Parameters:
     - history: list of metric values over epochs/iterations
     - title: title of the plot
@@ -85,8 +86,8 @@ def plot_training_history(
     - img_name: filename for saving the image (if SAVE_IMAGES is True)
     - figsize: size of the plot figure
     - marker: marker style for the plot points (default is "o")
-    '''
-    
+    """
+
     plt.figure(figsize=figsize)
     if marker:
         plt.plot(range(1, len(history) + 1), history, marker=marker)
@@ -135,12 +136,12 @@ def compare_methods(
     popularity_vars: PopularityVariables,
     methods_vars: dict[str, MF_Variables | LTR_Variables],
 ) -> None:
-    '''
+    """
     Compares the evaluation results of all methods by printing their average
     recall@10, ndcg@10, and diversity@10.
     Also prints example recommendations for a specific user for each method.
-    '''
-    
+    """
+
     # Collecting the results DataFrames for all methods (popularity and MF/LTR) to compare their average metrics
     results_dfs = [popularity_vars.results.df] + [
         methods_vars[m].results.df for m in general_vars.done_methods_names
@@ -158,10 +159,10 @@ def compare_methods(
 
 
 def load_data(config: Config) -> tuple[pd.DataFrame, pd.DataFrame]:
-    '''
+    """
     Loads the MovieLens 100k dataset ratings and items dataframes.
-    '''
-    
+    """
+
     # Defining column names for the datasets
     _ratings_cols = ["user_id", "item_id", "rating", "timestamp"]
     _item_cols = [
@@ -211,10 +212,10 @@ def load_data(config: Config) -> tuple[pd.DataFrame, pd.DataFrame]:
 def get_train_test_split(
     config: Config, general_vars: GeneralVariables
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    '''
+    """
     Splits the ratings dataframe into train and test sets using sklearn's train_test_split.
-    '''
-    
+    """
+
     train_df, test_df = train_test_split(
         general_vars.ratings, test_size=config.TEST_SIZE, random_state=config.RANDOM_STATE
     )
@@ -228,11 +229,11 @@ def get_train_test_split(
 
 
 def get_genre_vectors(general_vars: GeneralVariables) -> dict[int, list[float]]:
-    '''
+    """
     Prepares a dictionary mapping item_id to its genre vector
     (list of 0s and 1s for each genre).
-    '''
-    
+    """
+
     # Defining the genre columns in the items dataframe
     genre_columns = [
         "unknown",
@@ -266,11 +267,11 @@ def get_genre_vectors(general_vars: GeneralVariables) -> dict[int, list[float]]:
 
 
 def get_eligible_users(config: Config, general_vars: GeneralVariables) -> list:
-    '''
+    """
     Prepares a list of eligible users for evaluation, which are users that
     have at least one relevant item in the test set (rating >= 4).
-    '''
-    
+    """
+
     # Eligible users are those that have at least one relevant item in the test set (rating >= 4)
     eligible_users = [u for u in general_vars.all_users if u in general_vars.relevant_items_by_user]
 
@@ -325,28 +326,28 @@ def save_logs(
     hyperparameters: dict,
     ema_logs: bool = False,
 ) -> None:
-    '''
+    """
     Saves the evaluation logs in a JSONL file in the logs directory. Each line
     in the file corresponds to a JSON object with the user_id, method, top_k
     recommendations, evaluation metrics, and hyperparameters. If ema_logs is
     True, it saves logs in a different format suitable for EMA sessions.
-    '''
+    """
 
     # Helper function to convert user_id to internal index if index mapping is available
     def to_internal_user_id(user_id: int) -> int:
-        '''
+        """
         Converts the original user_id to the internal index used for MF methods if
         index mapping is available. Otherwise, returns the original user_id as an integer.
-        '''
-        
+        """
+
         # If the index mapping is not available, return the original user_id as an integer
         if general_vars is None or general_vars.index_map is None:
             return int(user_id)
-        
+
         # If the user_id is in the index mapping, return the corresponding internal index
         if user_id in general_vars.index_map.user_to_index:
             return int(general_vars.index_map.user_to_index[user_id])
-    
+
         # If the user_id is not in the index mapping, return the original user_id as an integer
         return int(user_id)
 
@@ -405,10 +406,10 @@ def print_examples_recommendations(
     user_id: int,
     popularity_vars: PopularityVariables | None = None,
 ) -> None:
-    '''
+    """
     Prints example recommendations for a specific user using the given
     recommendation function and model variables.
-    '''
+    """
 
     # Generating recommendations for the user using the appropriate recommendation function
     if popularity_vars is None:
@@ -418,7 +419,9 @@ def print_examples_recommendations(
 
     # Printing the example recommendations for the user, including the
     # recommended item ids and their corresponding titles
-    print(f"\nExample recommendations for user_id {user_id} using {model_vars.method_name.upper()} recommender:")
+    print(
+        f"\nExample recommendations for user_id {user_id} using {model_vars.method_name.upper()} recommender:"
+    )
     print("User:", user_id)
     print(f"Top-10 {model_vars.method_name.upper()} item ids:", example_recs_mf)
     print(
@@ -435,12 +438,12 @@ def evaluate_method(
     popularity_vars: PopularityVariables | None = None,
     example_user_id: int | None = None,
 ) -> ResultBundle:
-    '''
+    """
     Evaluates a recommendation method (MF SGD/ALS or pairwise LTR) by generating
     recommendations for each eligible user, calculating evaluation metrics
     (recall@10, ndcg@10, diversity@10), and returning the results in a ResultBundle.
-    '''
-    
+    """
+
     # Determining the recommendation function to use based on the method type (MF or LTR)
     method_name = method_vars.method_name
     recommend_func: callable = (
@@ -492,11 +495,12 @@ def setup_hyperparameters(
     mf_sgd_vars: MF_Variables,
     mf_als_vars: MF_Variables,
     pairwise_ltr_vars: LTR_Variables,
+    mmr_vars: MMR_Variables,
 ) -> None:
-    '''
+    """
     Sets up the hyperparameters for all methods in their respective variable containers.
-    '''
-    
+    """
+
     mf_sgd_vars.hyperparameters = {
         "k": config.TOP_K,
         "d": config.MF_SGD_DIM,
@@ -518,6 +522,12 @@ def setup_hyperparameters(
         "max_pairs_per_user": config.LTR_MAX_PAIRS_PER_USER,
         "use_popularity": config.LTR_USE_POPULARITY,
     }
+    mmr_vars.hyperparameters = {
+        "M": config.TOP_M,
+        "alpha": config.MMR_ALPHA_VALUES,
+        "normalize_rel": config.MMR_NORMALIZE_REL,
+        "base_ranker": "",  # placeholder, will be set during evaluation
+    }
 
 
 def train_method(
@@ -527,13 +537,13 @@ def train_method(
     methods_vars: dict[str, MF_Variables | LTR_Variables],
     method_name: str,
 ) -> ResultBundle | None:
-    '''
+    """
     Trains a recommendation method and returns the trained model.
     - For MF methods, it trains the model and returns the training history.
     - For pairwise LTR, it trains the model using the specified MF method's
       embeddings and returns the training history and learned parameters.
-    '''
-    
+    """
+
     # Training the specified method and return the model and training history
     if method_name == "mf_sgd":
         model = train_mf_sgd(config, general_vars)
@@ -567,13 +577,13 @@ def is_verify_ltr_config_ok(
     config: Config,
     general_vars: GeneralVariables,
 ) -> bool:
-    '''
+    """
     Verifies that the configuration for pairwise LTR training is valid:
     - The specified LTR_MF_METHOD must be in the METHODS list.
     - The specified LTR_MF_METHOD must have been trained before LTR training.
     Returns True if the configuration is valid, False otherwise.
-    '''
-    
+    """
+
     if config.LTR_MF_METHOD not in config.METHODS:
         print(f"Error: LTR_MF_METHOD '{config.LTR_MF_METHOD}' must be in METHODS for pairwise LTR.")
         return False
@@ -589,11 +599,11 @@ def show_plots(
     model: dict,
     method_name: str,
 ) -> None:
-    '''
+    """
     Shows and/or saves the training history plot for the specified method.
      - For MF methods, it plots the training RMSE over epochs/iterations.
      - For pairwise LTR, it plots the training loss over epochs.
-    '''
+    """
 
     # Extracting the training history from the model and plotting it with appropriate titles and labels
     history = model["history"]
@@ -613,20 +623,20 @@ def print_eval_summary(
     result_bundle: ResultBundle,
     example_user_id: int | None = None,
 ) -> None:
-    '''
+    """
     Prints a summary of the evaluation results for a given method, including:
     - Average recall@10, ndcg@10, and diversity@10 across all eligible users.
     - Example recommendations for a specific user (if example_user_id is provided).
     - RMSE for MF methods (if applicable).
-    '''
-    
+    """
+
     print("-- Evaluation Summary --")
     method_name = method_vars.method_name
 
     print(f"\nAverage recall@10: {result_bundle.df['recall@10'].mean():.6f}")
     print(f"Average ndcg@10: {result_bundle.df['ndcg@10'].mean():.6f}")
     print(f"Average diversity@10: {result_bundle.df['diversity@10'].mean():.6f}")
-    
+
     if method_name != "pairwise_ltr":
         print_rmse(general_vars, method_vars.model)
 
@@ -638,9 +648,38 @@ def print_eval_summary(
         user_id=example_user_id if example_user_id is not None else 1,
         popularity_vars=popularity_vars if method_name == "pairwise_ltr" else None,
     )
-    
+
     if config.ADVANCED_PRINT_MODE:
         print("Full evaluation results (first 5 rows):")
         print(result_bundle.df.head())
-    
+
     print("-- End of Summary --")
+
+
+def make_mmr_summary(
+    config: Config,
+    mmr_vars: MF_Variables | LTR_Variables,
+    method: str,
+) -> None:
+    '''
+    Summarizes the MMR evaluation results by alpha and prints the summary.
+    Also plots the MMR tradeoff between NDCG@10 and Diversity@10 if SHOW_PLOTS or SAVE_IMAGES is True.
+    '''
+    
+    # Summarizing MMR results by alpha
+    mmr_summary_df = (
+        mmr_vars.results.df.groupby("alpha")[["recall@10", "ndcg@10", "diversity@10"]]
+        .mean()
+        .reset_index()
+    )
+
+    if config.PRINT_CONFIRM:
+        print("\nMMR evaluation summary:")
+        print(mmr_summary_df)
+
+    if config.SHOW_PLOTS or config.SAVE_IMAGES:
+        plot_mmr_tradeoff(
+            config,
+            mmr_summary_df,
+            method,
+        )

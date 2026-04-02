@@ -116,5 +116,3 @@ class EMA_Variables:
     recommended_items: list[int] = None
 
     session_results: list = None
-    session_summary_df: pd.DataFrame = None
-    session_recommendations_df: pd.DataFrame = None

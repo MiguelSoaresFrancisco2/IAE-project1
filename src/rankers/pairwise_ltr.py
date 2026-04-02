@@ -184,6 +184,7 @@ def predict_pairwise_ltr(
     user_id: int,
     item_id: int,
 ) -> float:
+    '''Predicts the LTR score for a given user_id and item_id by building the feature vector'''
     features = build_ltr_feature_vector(
         config,
         general_vars,

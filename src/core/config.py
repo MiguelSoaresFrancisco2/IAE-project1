@@ -7,7 +7,7 @@ class Config:
     SAVE_IMAGES: bool = True
     SHOW_PLOTS: bool = False
     PRINT_CONFIRM: bool = True
-    ADVANCED_PRINT_MODE: bool = False
+    ADVANCED_PRINT_MODE: bool = True
     TEST_SIZE: float = 0.2
 
     COMPARE_METHODS: bool = True
@@ -36,13 +36,14 @@ class Config:
 
     TOP_M: int = None
     MMR_ALPHA_VALUES: list[float] = [0.1, 0.4, 0.7]
+    MMR_NORMALIZE_REL: bool = True
     METHODS_TO_APPLY_MMR: list[str] = ["mf_sgd", "mf_als", "pairwise_ltr"]  # or just a subset
 
     EMA_MF_METHODS: list[str] = ["mf_sgd", "mf_als"]  # or just a subset
     EMA_RHO: float = 0.1
-    EMA_BETA: float = 0.3
+    EMA_RHO_VALUES: list[float] = [0.1, 0.3]
     EMA_ROUNDS: int = 5
-
+    EMA_SESSION_USERS: int = 3
 
     def __init__(self):
         if Config.FAST_MODE:

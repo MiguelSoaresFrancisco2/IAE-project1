@@ -10,7 +10,7 @@ from core.structs import (
 )
 
 from core.utils import (
-    plot_mmr_tradeoff,
+    make_mmr_summary,
     compare_methods,
     save_logs,
     evaluate_method,
@@ -20,9 +20,10 @@ from core.utils import (
 )
 
 from personalization.ema import (
-    get_session_recommendations,
+    compare_rho_values,
     get_session_results,
-    get_session_summary_df,
+    plot_rho_overlap,
+    summarize_rho_overlap,
 )
 from rankers.pairwise_ltr import (
     build_pairwise_training_data,
@@ -43,15 +44,15 @@ if __name__ == "__main__":
     #######################################################################
     #                   CREATION AND SETUP OF VARIABLES                   #
     #######################################################################
-    
+
     print("==================================================")
     print("Setting up variables and data...")
-    print("==================================================\n")
+    print("==================================================")
 
     # Set up configuration and random seed
     config = Config()
     config.set_seed()
-    
+
     # Creating the logs directory if it doesn't exist
     os.makedirs("logs", exist_ok=True)
 
@@ -61,6 +62,8 @@ if __name__ == "__main__":
     mf_sgd_vars = MF_Variables("mf_sgd")
     mf_als_vars = MF_Variables("mf_als")
     pairwise_ltr_vars = LTR_Variables("pairwise_ltr")
+    mmr_vars = MMR_Variables()
+    ema_vars = EMA_Variables()
 
     # Data setup: load, split, evaluation caches, genre vectors, eligible users, etc.
     general_vars = setup_general_vars(config, general_vars)
@@ -72,7 +75,7 @@ if __name__ == "__main__":
     example_user_id = general_vars.eligible_users[0] if general_vars.eligible_users else None
 
     # Set up hyperparameters for all methods
-    setup_hyperparameters(config, mf_sgd_vars, mf_als_vars, pairwise_ltr_vars)
+    setup_hyperparameters(config, mf_sgd_vars, mf_als_vars, pairwise_ltr_vars, mmr_vars)
 
     # Building pairwise training data for LTR
     pairwise_ltr_vars.train_data = build_pairwise_training_data(config, general_vars)
@@ -115,7 +118,7 @@ if __name__ == "__main__":
     #######################################################################
     # MATRIX FACTORIZATION WITH SGD AND ALS AND PAIRWISE LTR RECOMMENDERS #
     #######################################################################
-    
+
     print("\n\n==================================================")
     print("Training and evaluating MF and LTR recommenders...")
     print("==================================================")
@@ -158,21 +161,21 @@ if __name__ == "__main__":
     # MMR  #
     #######################################################################
 
-    print("\nApplying MMR re-ranking...")
-    mmr_vars = MMR_Variables()
-    mmr_vars.hyperparameters = {
-        "M": config.TOP_M,
-        "alpha": config.MMR_ALPHA_VALUES,
-        "base_ranker": "",  # placeholder, will be set during evaluation
-    }
+    print("\n\n==================================================")
+    print("Applying MMR re-ranking...")
+    print("==================================================")
 
+    # Verifying that all methods to apply MMR on have been trained
+    # then applying MMR and evaluating it for each method
     if any(m not in general_vars.done_methods_names for m in config.METHODS_TO_APPLY_MMR):
         print("Error: All methods in METHODS_TO_APPLY_MMR must be trained before applying MMR.")
     else:
         for method in config.METHODS_TO_APPLY_MMR:
-            print(f"\nApplying MMR to {method.upper()} recommendations...")
+            print(f"\n====== Applying MMR to {method.upper()} recommendations... ======\n")
 
+            # Printing an example of MMR re-ranking for the example user and this method
             if config.PRINT_CONFIRM:
+                print("Example MMR re-ranking:")
                 print_mmr_example(
                     config,
                     general_vars,
@@ -181,6 +184,7 @@ if __name__ == "__main__":
                     user_id=example_user_id if example_user_id is not None else 1,
                 )
 
+            # Evaluating MMR re-ranking for this method and storing the results
             mmr_vars.results = evaluate_mmr(
                 config,
                 general_vars,
@@ -189,22 +193,11 @@ if __name__ == "__main__":
                 popularity_vars=popularity_vars if method == "pairwise_ltr" else None,
             )
 
-            mmr_summary_df = (
-                mmr_vars.results.df.groupby("alpha")[["recall@10", "ndcg@10", "diversity@10"]]
-                .mean()
-                .reset_index()
-            )
+            # Making a summary of the MMR evaluation results for this method and saving logs in a JSONL file
+            if config.PRINT_CONFIRM or config.SHOW_PLOTS or config.SAVE_IMAGES:
+                make_mmr_summary(config, mmr_vars, method)
 
-            if config.PRINT_CONFIRM:
-                print(mmr_summary_df)
-
-            if config.SHOW_PLOTS or config.SAVE_IMAGES:
-                plot_mmr_tradeoff(
-                    config,
-                    mmr_summary_df,
-                    method,
-                )
-
+            # Storing the base ranker method in the MMR hyperparameters for better log organization and later analysis
             mmr_vars.hyperparameters["base_ranker"] = method
             save_logs(
                 config,
@@ -220,22 +213,32 @@ if __name__ == "__main__":
     # EMA  #
     #######################################################################
 
-    ema_vars = EMA_Variables()
+    print("\n\n==================================================")
+    print("Running EMA personalization evaluation...")
+    print("==================================================")
+
+    # Verifying that all MF methods to use as base models in EMA have been trained
     if any(m not in general_vars.done_methods_names for m in config.EMA_MF_METHODS):
         print("Error: All methods in EMA_MF_METHODS must be trained before running EMA.")
-
     else:
-        ema_vars.session_users = general_vars.eligible_users[:3]
+        # Setting up session users for EMA (taking the first N eligible users based on config.EMA_SESSION_USERS)
+        ema_vars.session_users = general_vars.eligible_users[: config.EMA_SESSION_USERS]
 
         if config.PRINT_CONFIRM:
+            print("\nEMA session users:")
             print(ema_vars.session_users)
 
+        # Running EMA evaluation for each specified base MF method and saving logs in JSONL files
         for method in config.EMA_MF_METHODS:
             print(f"\nRunning EMA with {method.upper()} as base MF model...")
 
+            # Storing the base MF model and method name in EMA variables for use during
+            # the session evaluation
             ema_vars.mf_model = methods_vars[method].model
             ema_vars.mf_method_name = method
 
+            # Getting session results, summary dataframe, and recommendations dataframe
+            # for this EMA evaluation
             ema_vars.session_results = get_session_results(
                 config,
                 general_vars,
@@ -244,16 +247,26 @@ if __name__ == "__main__":
                 ema_vars,
             )
 
-            ema_vars.session_summary_df = get_session_summary_df(
+            # Comparing different rho values for this EMA session evaluation and plotting
+            # the overlap of recommendations between them
+            rho_session_results = compare_rho_values(
                 config,
+                general_vars,
+                popularity_vars,
+                pairwise_ltr_vars,
                 ema_vars,
             )
+            rho_overlap_df = summarize_rho_overlap(rho_session_results)
 
-            ema_vars.session_recommendations_df = get_session_recommendations(
-                config,
-                ema_vars,
-            )
+            if config.PRINT_CONFIRM:
+                print("\nEMA rho overlap summary:")
+                print(rho_overlap_df)
 
+            if config.SHOW_PLOTS or config.SAVE_IMAGES:
+                plot_rho_overlap(config, rho_overlap_df, method)
+
+            # Saving logs for this EMA session evaluation in a JSONL file with details
+            # about the base MF method, rho value, number of rounds, and top-K recommendations
             save_logs(
                 config,
                 general_vars,
@@ -262,7 +275,6 @@ if __name__ == "__main__":
                 {
                     "mf_method": method,
                     "rho": config.EMA_RHO,
-                    "beta": config.EMA_BETA,
                     "rounds": config.EMA_ROUNDS,
                     "k": config.TOP_K,
                 },
