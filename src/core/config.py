@@ -3,7 +3,7 @@ import numpy as np
 
 
 class Config:
-    FAST_MODE: bool = True
+    FAST_MODE: bool = False
     SAVE_IMAGES: bool = True
     SHOW_PLOTS: bool = False
     PRINT_CONFIRM: bool = True
@@ -32,7 +32,7 @@ class Config:
     LTR_LR: float = 0.01
     LTR_REG: float = 0.001
     LTR_MF_METHOD: str = "mf_sgd"  # or "mf_als"
-    LTR_USE_POPULARITY: bool = True
+    LTR_USE_POPULARITY: bool = False
 
     TOP_M: int = None
     MMR_ALPHA_VALUES: list[float] = [0.1, 0.4, 0.7]

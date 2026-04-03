@@ -1,0 +1,26 @@
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{p{0.34\textwidth} p{0.58\textwidth}}
+\toprule
+\textbf{Ficheiro / Módulo} & \textbf{Função} \\
+\midrule
+\texttt{src/main.py} & Orquestra toda a execução do projeto: configuração, treino dos modelos, avaliação, aplicação de MMR, sessões com EMA e criação de logs. \\
+\texttt{src/core/config.py} & Define os principais parâmetros experimentais, hiperparâmetros dos modelos e opções de execução, incluindo o modo FAST MODE. \\
+\texttt{src/core/structs.py} & Contém as estruturas de dados e classes auxiliares usadas para guardar resultados, variáveis globais e modelos. \\
+\texttt{src/core/candidates.py} & Gera o conjunto de filmes candidatos para cada utilizador, excluindo os itens já observados no treino. \\
+\texttt{src/core/utils.py} & Reúne funções auxiliares para carregamento de dados, preparação da avaliação, geração de gráficos, comparação de métodos e escrita de logs. \\
+\texttt{src/core/metrics.py} & Implementa as métricas de avaliação usadas no projeto, nomeadamente Recall@10, NDCG@10, similaridade do cosseno e Diversity@10. \\
+\texttt{src/rankers/popularity.py} & Implementa o baseline de popularidade, responsável por recomendar filmes com base no número de interações no treino. \\
+\texttt{src/rankers/mf\_general.py} & Contém funções gerais para os modelos de fatorização matricial, incluindo preparação dos dados, previsão de ratings, recomendação e cálculo de RMSE. \\
+\texttt{src/rankers/mf\_sgd.py} & Implementa o treino do modelo de Matrix Factorization com SGD, incluindo fatores latentes, biases e histórico de treino. \\
+\texttt{src/rankers/mf\_als.py} & Implementa o treino do modelo de Matrix Factorization com ALS, atualizando alternadamente fatores latentes e biases. \\
+\texttt{src/rankers/pairwise\_ltr.py} & Implementa o modelo Pairwise Learning-to-Rank, incluindo criação dos pares de treino, construção das features, treino e recomendação. \\
+\texttt{src/reranker/mmr.py} & Implementa o reranking com MMR para aumentar a diversidade das listas recomendadas, equilibrando relevância e diversidade. \\
+\texttt{src/personalization/ema.py} & Implementa a atualização dinâmica do estado do utilizador com EMA e a simulação de sessões iterativas de recomendação. \\
+\bottomrule
+\end{tabular}
+\caption{Descrição resumida dos principais ficheiros do projeto.}
+\label{tab:estrutura_ficheiros}
+\end{table}

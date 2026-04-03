@@ -1,0 +1,152 @@
+
+\section*{T1 (ALS closed-form update)}
+
+\subsection*{1. Redução a um Problema de Regressão Ridge}
+
+O objetivo da Fatoração de Matrizes (MF) é minimizar o erro quadrático entre a classificação real $r_{ui}$ e a prevista $\hat{r}_{ui}$. A previsão é definida como:
+\begin{equation}
+\hat{r}_{ui} = \mu + b_u + b_i + p_u^\top q_i
+\end{equation}
+
+Para isolar a otimização do vetor do utilizador $p_u$, definimos o \textbf{resíduo} $e_{ui}$ como a parte do rating que não é explicada pelos termos fixos ($\mu, b_u, b_i$):
+\begin{equation}
+e_{ui} = r_{ui} - (\mu + b_u + b_i)
+\end{equation}
+
+Ao fixar os vetores dos itens $Q$, a função de custo local para um utilizador $u$ com regularização $L_2$ torna-se:
+\begin{equation}
+\min_{p_u} \sum_{i \in \Omega(u)} (e_{ui} - p_u^\top q_i)^2 + \lambda \|p_u\|^2
+\end{equation}
+
+Esta expressão é a forma canónica de uma \textbf{Regressão Ridge}, onde $p_u$ atua como o vetor de pesos, $q_i$ como as características (features) e $e_{ui}$ como o valor alvo.
+
+\subsection*{2. Derivação das Equações Normais}
+
+Para encontrar o valor ótimo de $p_u$, calculamos o gradiente da função de custo $J(p_u)$ e igualamos a zero:
+
+\textbf{Passo A: Gradiente}
+\begin{equation}
+\nabla_{p_u} J(p_u) = \sum_{i \in \Omega(u)} -2(e_{ui} - p_u^\top q_i)q_i + 2\lambda p_u
+\end{equation}
+
+\textbf{Passo B: Condição de Primeira Ordem}
+Igualando a zero e simplificando o fator 2:
+\begin{equation}
+\sum_{i \in \Omega(u)} (p_u^\top q_i)q_i + \lambda p_u = \sum_{i \in \Omega(u)} e_{ui} q_i
+\end{equation}
+
+\textbf{Passo C: Formulação Matricial}
+Reescrevendo o produto escalar $(p_u^\top q_i)q_i$ como $(q_i q_i^\top) p_u$ e utilizando a matriz Identidade $I$:
+\begin{equation}
+\left( \sum_{i \in \Omega(u)} q_i q_i^\top + \lambda I \right) p_u = \sum_{i \in \Omega(u)} e_{ui} q_i
+\end{equation}
+
+\textbf{Passo D: Solução de Forma Fechada}
+Multiplicando pelo inverso da matriz resultante, obtemos a regra de atualização do ALS:
+\begin{equation}
+p_u = \left( \sum_{i \in \Omega(u)} q_i q_i^\top + \lambda I \right)^{-1} \left( \sum_{i \in \Omega(u)} e_{ui} q_i \right)
+\end{equation}
+
+\section*{T2 (SGD updates for MF with biases)}
+
+A função de previsão para a classificação $\hat{r}_{ui}$ é definida como:
+\begin{equation}
+\hat{r}_{ui} = \mu + b_u + b_i + p_u^\top q_i
+\end{equation}
+
+O objetivo é minimizar o erro quadrático com regularização $\ell_2$ para cada observação $(u, i) \in \Omega$. A função de custo local $J_{ui}$ é:
+\begin{equation}
+J_{ui} = (r_{ui} - \hat{r}_{ui})^2 + \lambda (\|p_u\|^2 + \|q_i\|^2 + b_u^2 + b_i^2)
+\end{equation}
+
+Definimos o erro de previsão como $\epsilon_{ui} = r_{ui} - \hat{r}_{ui}$. Para derivar as atualizações SGD, calculamos o gradiente negativo de $J_{ui}$ em ordem a cada parâmetro.
+
+\subsection*{1. Derivação dos Gradientes}
+Aplicando a regra da cadeia, os gradientes em relação aos parâmetros são:
+\begin{itemize}
+    \item $\frac{\partial J_{ui}}{\partial p_u} = -2(r_{ui} - \hat{r}_{ui})q_i + 2\lambda p_u = -2\epsilon_{ui}q_i + 2\lambda p_u$
+    \item $\frac{\partial J_{ui}}{\partial q_i} = -2(r_{ui} - \hat{r}_{ui})p_u + 2\lambda q_i = -2\epsilon_{ui}p_u + 2\lambda q_i$
+    \item $\frac{\partial J_{ui}}{\partial b_u} = -2(r_{ui} - \hat{r}_{ui}) + 2\lambda b_u = -2\epsilon_{ui} + 2\lambda b_u$
+    \item $\frac{\partial J_{ui}}{\partial b_i} = -2(r_{ui} - \hat{r}_{ui}) + 2\lambda b_i = -2\epsilon_{ui} + 2\lambda b_i$
+\end{itemize}
+
+\subsection*{2. Regras de Atualização}
+Seguindo a direção oposta ao gradiente ($\theta \leftarrow \theta - \eta \nabla J$) e absorvendo o fator 2 na taxa de aprendizagem $\eta$, obtemos as seguintes regras de atualização:
+\begin{itemize}
+    \item $p_u \leftarrow p_u + \eta (\epsilon_{ui} q_i - \lambda p_u)$
+    \item $q_i \leftarrow q_i + \eta (\epsilon_{ui} p_u - \lambda q_i)$
+    \item $b_u \leftarrow b_u + \eta (\epsilon_{ui} - \lambda b_u)$
+    \item $b_i \leftarrow b_i + \eta (\epsilon_{ui} - \lambda b_i)$
+\end{itemize}
+
+
+
+
+
+\section*{T3 (Pairwise gradient)}
+
+O objetivo é demonstrar que o gradiente da função de perda logística em relação aos parâmetros $\phi$ é dado por:
+\begin{equation}
+\nabla_{\phi} \left( -\log \sigma(\phi^\top \Delta f) \right) = \left( \sigma(\phi^\top \Delta f) - 1 \right) \Delta f
+\end{equation}
+
+\subsection*{Demonstração Passo a Passo}
+
+Seja $z = \phi^\top \Delta f$. A função que queremos derivar é $L(\phi) = -\log \sigma(z)$.
+
+\textbf{1. Derivada da função sigmóide ($\sigma$):}
+Sabemos que a derivada da função sigmóide $\sigma(z) = \frac{1}{1 + e^{-z}}$ em relação a $z$ é:
+\begin{equation}
+\sigma'(z) = \sigma(z)(1 - \sigma(z))
+\end{equation}
+
+\textbf{2. Aplicação da Regra da Cadeia:}
+Utilizando a regra da cadeia para o logaritmo e para a sigmóide:
+\begin{equation}
+\nabla_{\phi} L(\phi) = -\frac{1}{\sigma(z)} \cdot \frac{\partial \sigma(z)}{\partial z} \cdot \nabla_{\phi} z
+\end{equation}
+
+\textbf{3. Substituição das derivadas:}
+Substituindo $\sigma'(z)$ e notando que $\nabla_{\phi} (\phi^\top \Delta f) = \Delta f$:
+\begin{equation}
+\nabla_{\phi} L(\phi) = -\frac{1}{\sigma(z)} \cdot \left[ \sigma(z)(1 - \sigma(z)) \right] \cdot \Delta f
+\end{equation}
+
+\textbf{4. Simplificação:}
+Os termos $\sigma(z)$ no numerador e denominador anulam-se:
+\begin{equation}
+\nabla_{\phi} L(\phi) = -(1 - \sigma(z)) \Delta f
+\end{equation}
+\begin{equation}
+\nabla_{\phi} L(\phi) = (\sigma(z) - 1) \Delta f
+\end{equation}
+
+\textbf{5. Resultado Final:}
+Substituindo $z$ de volta pela expressão original $\phi^\top \Delta f$:
+\begin{equation}
+\nabla_{\phi} \left( -\log \sigma(\phi^\top \Delta f) \right) = \left( \sigma(\phi^\top \Delta f) - 1 \right) \Delta f
+\end{equation}
+
+\section*{T4 (Why RMSE $\neq$ ranking quality?)}
+
+Otimizar o RMSE (Root Mean Squared Error) em modelos de Fatoração de Matrizes nem sempre garante uma boa qualidade de recomendação Top-K devido aos seguintes fatores:
+
+\begin{itemize}
+    \item \textbf{Foco na Regressão vs. Ordenação:} O RMSE trata o problema como uma regressão pontual, tentando prever o valor exato de cada classificação. No entanto, para recomendações, o que importa é a ordem relativa entre os itens (ranking) e não a precisão do valor absoluto da nota.
+    
+    \item \textbf{Peso Igual a Erros Irrelevantes:} O RMSE penaliza igualmente um erro de previsão num item que o utilizador detesta (ex: prever 2 em vez de 1) e num item que o utilizador adoraria (ex: prever 4 em vez de 5). Para o cenário de Top-K, apenas os erros ocorridos no topo da lista são realmente críticos para a experiência do utilizador.
+    
+    \item \textbf{Desalinhamento com Métricas de Negócio:} O objetivo de um sistema de entretenimento é frequentemente maximizar métricas como NDCG ou Recall, que dependem da posição dos itens relevantes na lista. Um modelo pode reduzir o seu RMSE global ao prever melhor as notas baixas da "cauda longa" (long-tail) sem nunca melhorar a visibilidade dos itens que o utilizador realmente escolheria consumir.
+    
+    \item \textbf{Viés de Dados Observados:} O RMSE é calculado apenas sobre interações observadas (ratings explícitos). Isto ignora a estrutura de interações implícitas, onde o ato de escolher um item entre várias opções num conjunto de candidatos é um sinal de preferência muito mais forte para o ranking do que a precisão de uma nota isolada.
+\end{itemize}
+
+
+
+\subsection*{Observações e Resultados do Projeto}
+No âmbito do projeto desenvolvido, observou-se que a redução do RMSE durante o treino do MF-ALS não se traduziu numa melhoria equivalente das métricas de ranking. Em particular, apesar de o RMSE descer de forma consistente, o NDCG@10 médio manteve-se baixo (0.0294), enquanto o modelo pairwise LTR, com perda de treino mais elevada, atingiu NDCG@10 de 0.1852. Este contraste confirma que otimizar o erro de previsão de ratings não garante um bom ordenamento dos itens no topo da lista.
+\section*{T5 (Offline evaluation caveat)}
+
+A avaliação offline pode ser enganosa porque os dados históricos não são neutros, mas sim o resultado de uma política de exposição anterior que gera um \textbf{viés de seleção}. Itens que nunca foram mostrados constituem "pontos cegos", impossibilitando testar a reação do utilizador a esses conteúdos. Além disso, o modelo pode limitar-se a imitar os enviesamentos do sistema antigo, ignorando a \textbf{natureza de ciclo fechado} dos recomendadores, onde o ranking atua como uma intervenção que molda o comportamento e os dados futuros. Sem exposição aleatória, criam-se \textbf{ciclos de feedback} que amplificam a popularidade e reduzem a diversidade, algo que métricas estáticas como o NDCG não conseguem capturar totalmente por ignorarem a deriva de dados (data drift) causada pelo próprio sistema.
+
+
