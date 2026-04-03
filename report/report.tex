@@ -61,11 +61,11 @@
 
 \section{Introdução}
 
-No contexto da disciplina de Inteligência Artificial para Entretenimento, os sistemas de recomendação têm um papel fundamental na seleção e organização de conteúdos relevantes para cada utilizador. Neste projeto, esse problema é abordado sob a perspetiva de \textit{co-creative curation}, em que a recomendação é vista como um processo iterativo que combina geração de candidatos, ranking, reranking, feedback e atualização da personalização. Com base no dataset MovieLens 100K, foi desenvolvido um pipeline completo capaz de produzir listas top-$K$ de filmes adaptadas às preferências dos utilizadores. Para este efeito, foram implementados e comparados diferentes métodos de ranking, incluindo um baseline de popularidade, modelos de fatorização matricial com SGD e ALS, e um modelo de \textit{Pairwise Learning-to-Rank}. Adicionalmente, foi incorporado um mecanismo de reranking com MMR para controlar a diversidade das recomendações e um mecanismo de atualização do estado do utilizador com EMA para simular sessões sucessivas de interação. A avaliação experimental foi realizada com recurso às métricas Recall@10, NDCG@10 e Diversity@10, permitindo analisar não só a relevância das recomendações, mas também o equilíbrio entre precisão, diversidade e adaptação dinâmica ao utilizador.
+No contexto da disciplina de Inteligência Artificial para Entretenimento, os sistemas de recomendação têm um papel fundamental na seleção e organização de conteúdos relevantes para cada utilizador. Neste projeto, esse problema é abordado sob a perspetiva de \textit{co-creative curation}, em que a recomendação é vista como um processo iterativo que combina geração de candidatos, ranking, reranking, feedback e atualização da personalização. Com base no dataset MovieLens 100K, foi desenvolvido uma pipeline completo capaz de produzir listas top-$K$ de filmes adaptadas às preferências dos utilizadores. Para este efeito, foram implementados e comparados diferentes métodos de ranking, incluindo um baseline de popularidade, modelos de fatorização matricial com SGD e ALS, e um modelo de \textit{Pairwise Learning-to-Rank}. Adicionalmente, foi incorporado um mecanismo de reranking com MMR para controlar a diversidade das recomendações e um mecanismo de atualização do estado do utilizador com EMA para simular sessões sucessivas de interação. A avaliação experimental foi realizada com recurso às métricas Recall@10, NDCG@10 e Diversity@10, permitindo analisar não só a relevância das recomendações, mas também o equilíbrio entre precisão, diversidade e adaptação dinâmica ao utilizador.
 
 \section{Arquitetura do Sistema}
 
-O sistema segue a sequência exigida no enunciado: geração de candidatos, ranking, reranking com controlo de diversidade, feedback e atualização do estado do utilizador. A Tabela~\ref{tab:estrutura_ficheiros} resume os principais módulos que implementam cada bloco do pipeline e a respetiva função no fluxo de execução.
+O sistema segue a sequência exigida no enunciado: geração de candidatos, ranking, reranking com controlo de diversidade, feedback e atualização do estado do utilizador. A Tabela~\ref{tab:estrutura_ficheiros} resume os principais módulos que implementam cada bloco da pipeline e a respetiva função no fluxo de execução.
 
 \input{tabela}
 
@@ -101,7 +101,7 @@ Em termos operacionais, as avaliações foram carregadas e divididas em treino e
 
 
 
-\section{Implementação do pipeline}
+\section{Implementação da pipeline}
 
 O fluxo completo de \textit{co-creative curation} está concentrado em \texttt{main.py} e segue o percurso exigido: geração de candidatos, ranking, reranking, feedback e atualização do estado do utilizador. O pipeline avalia primeiro o baseline de popularidade, treina e avalia os modelos de fatorização matricial e o \textit{pairwise LTR}, aplica MMR sobre os top-\(M\) candidatos e, por fim, simula sessões com EMA.
 
@@ -124,7 +124,7 @@ EMA & Sessões com 5 rondas, escolha heurística e atualização \(u_{t+1} = \fr
 Logs & JSONL por método e por sessão, com top-\(K\), métricas e hiperparâmetros. \\
 \bottomrule
 \end{tabular}
-\caption{Resumo da implementação do pipeline em \texttt{main.py}.}
+\caption{Resumo da implementação da pipeline em \texttt{main.py}.}
 \label{tab:pipeline_impl}
 \end{table}
 
@@ -179,13 +179,13 @@ Pares por utilizador (LTR) & 50 & 50 \\
 
 \section{Resultados}
 
-Nesta secção apresentam-se os principais resultados obtidos para os diferentes métodos implementados no pipeline de recomendação, considerando as métricas Recall@10, NDCG@10 e Diversity@10. Os valores reportados correspondem ao modo completo (\texttt{FAST\_MODE} desativado), com avaliação sobre todos os utilizadores elegíveis.
+Nesta secção apresentam-se os principais resultados obtidos para os diferentes métodos implementados na pipeline de recomendação, considerando as métricas Recall@10, NDCG@10 e Diversity@10. Os valores reportados correspondem ao modo completo (\texttt{FAST\_MODE} desativado), com avaliação sobre todos os utilizadores elegíveis.
 
 \subsection{Comparação entre métodos base}
 
 A Tabela~\ref{tab:main-results} resume os resultados médios obtidos pelos quatro métodos principais avaliados: baseline de popularidade, fatorização matricial com SGD, fatorização matricial com ALS e modelo \textit{pairwise learning-to-rank} (E1). No modo completo, o baseline de popularidade apresenta os melhores valores de Recall@10 (0.1372) e NDCG@10 (0.1764), o que indica que a popularidade global continua a ser um sinal forte neste dataset.
 
-O MF-SGD melhora relativamente ao MF-ALS, mas continua abaixo do baseline em relevância; o MF-ALS mantém o pior desempenho em Recall@10 e NDCG@10. O \textit{pairwise LTR} apresentou valores inferiores aos do baseline (Recall@10 de 0.0314 e NDCG@10 de 0.0470), mantendo diversidade semelhante. Este comportamento reforça a necessidade de analisar o impacto das features e das ablações (Secção de ablação).
+O MF-SGD melhora relativamente ao MF-ALS, mas continua abaixo do baseline em relevância; o MF-ALS mantém o pior desempenho em Recall@10 e NDCG@10. O \textit{pairwise LTR} apresentou valores inferiores aos do baseline (Recall@10 de 0.0314 e NDCG@10 de 0.0470), mantendo diversidade semelhante. Este comportamento reforça a necessidade de analisar o impacto das features e dos testes adicionais.
 
 Uma interpretação plausível para o desempenho do LTR é a escala heterogénea das features (por exemplo, a popularidade em contagens absolutas) e o facto de a previsão MF estar limitada ao intervalo de ratings. Sem normalização explícita, o modelo linear pode favorecer sinais dominantes, o que ajuda a explicar a melhoria observada quando a popularidade é removida.
 
@@ -210,11 +210,12 @@ De forma geral, os resultados indicam que otimizar diretamente para ordenação 
 
 \subsection{Impacto do reranking com MMR}
 
-Um dos requisitos experimentais do projeto (E2) consiste em apresentar um gráfico do compromisso entre relevância e diversidade, medido em termos de NDCG@10 e Diversity@10, para diferentes valores do parâmetro \(\alpha \in \{0.1, 0.4, 0.7\}\), aplicando o método MMR pelo menos a um baseline de fatorização matricial. Para satisfazer esse requisito, foi analisado o efeito do reranking com MMR sobre o modelo MF-SGD, representando graficamente a relação entre NDCG@10 e Diversity@10 para os diferentes valores de \(\alpha\).
+Um dos requisitos experimentais do projeto (E2) consiste em apresentar um gráfico do compromisso entre relevância e diversidade, medido em termos de NDCG@10 e Diversity@10, para diferentes valores do parâmetro \(\alpha \in \{0.1, 0.4, 0.7\}\), aplicando o método MMR pelo menos a um baseline de fatorização matricial. Para satisfazer este requisito, foi analisado o efeito do reranking com MMR sobre o modelo MF-SGD, representando graficamente a relação entre NDCG@10 e Diversity@10 para os diferentes valores de \(\alpha\).
 
 Após a avaliação dos rankers base, o método MMR foi aplicado para introduzir controlo explícito da diversidade nas listas finais. A Tabela~\ref{tab:mmr-results} apresenta os resultados médios para diferentes valores de \(\alpha\), usando como base os modelos MF-SGD, MF-ALS e Pairwise LTR, enquanto a Figura~\ref{fig:mmr_tradeoff_mf_sgd} ilustra graficamente o trade-off obtido no caso do MF-SGD. 
 
 No caso do MF-SGD, o reranking com MMR aumentou significativamente a diversidade: de 0.7338 sem reranking para 0.7957, 0.9304 e 0.9909 para \(\alpha = 0.1\), \(0.4\) e \(0.7\), respetivamente. Em paralelo, os valores de NDCG@10 passaram de 0.0805 (sem MMR) para 0.0790, 0.0718 e 0.0579 à medida que a diversidade aumentou. A Figura~\ref{fig:mmr_tradeoff_mf_sgd} ilustra este compromisso, com \(\alpha = 0.4\) a oferecer um equilíbrio entre diversidade elevada e perda moderada de relevância.
+
 
 Para o MF-ALS, o MMR também aumentou muito a diversidade, elevando-a para valores próximos de 0.96. No entanto, como o modelo base já apresentava fraca qualidade de ranking, o reranking não foi suficiente para recuperar relevância. Já no caso do Pairwise LTR, observou-se um comportamento mais equilibrado: a diversidade aumentou progressivamente com \(\alpha\), enquanto Recall@10 e NDCG@10 sofreram apenas uma ligeira degradação para valores mais elevados deste parâmetro. A Figura~\ref{fig:mmr_tradeoff_outros} mostra estes trade-offs adicionais e reforça o compromisso clássico entre relevância e diversidade.
 
@@ -270,7 +271,7 @@ Entre os resultados obtidos, destaca-se particularmente o Pairwise LTR com MMR e
 
 Para além da avaliação estática, foi ainda demonstrada a componente dinâmica de personalização através de sessões sucessivas com atualização por EMA. Foram realizadas sessões com 3 utilizadores, 5 rondas por sessão e comparação entre \(\rho = 0.1\) e \(\rho = 0.3\). Em cada ronda, o sistema produziu uma lista recomendada, simulou a escolha de um item e atualizou o vetor de estado do utilizador com base no item selecionado.
 
-Os resultados qualitativos mostram alterações graduais das listas ao longo das rondas. No MF-SGD, a sobreposição média entre listas consecutivas manteve-se elevada para \(\rho = 0.1\) (entre 0.768 e 0.818), enquanto com \(\rho = 0.3\) desceu para intervalos entre 0.624 e 0.725, indicando maior sensibilidade ao feedback recente. No MF-ALS, observou-se padrão semelhante: \(\rho = 0.1\) oscilou entre 0.674 e 0.818, e \(\rho = 0.3\) entre 0.465 e 0.632. Estas tendências são coerentes com a interpretação de \(\rho\) como taxa de atualização.
+Os resultados qualitativos mostram alterações graduais das listas ao longo das rondas. No MF-SGD, a sobreposição média entre listas consecutivas manteve-se elevada para \(\rho = 0.1\) (entre 0.768 e 0.818), enquanto que, com \(\rho = 0.3\) desceu para intervalos entre 0.624 e 0.725, indicando maior sensibilidade ao feedback recente. No MF-ALS, observou-se padrão semelhante: \(\rho = 0.1\) oscilou entre 0.674 e 0.818, e \(\rho = 0.3\) entre 0.465 e 0.632. Estas tendências são coerentes com a interpretação de \(\rho\) como taxa de atualização.
 
 \begin{figure}[H]
     \centering
@@ -286,7 +287,7 @@ Os resultados qualitativos mostram alterações graduais das listas ao longo das
     \label{fig:ema_rho_overlap}
 \end{figure}
 
-Estes resultados confirmam que o mecanismo de EMA implementado é capaz de introduzir adaptação temporal no pipeline, permitindo que o sistema reaja ao feedback do utilizador ao longo de uma sessão, em vez de produzir sempre listas estáticas.
+Estes resultados confirmam que o mecanismo de EMA implementado é capaz de introduzir adaptação temporal na pipeline, permitindo que o sistema reaja ao feedback do utilizador ao longo de uma sessão, em vez de produzir sempre listas estáticas.
 
 \subsection{Curvas de treino (modo completo)}
 Para complementar a análise, apresentam-se as curvas de treino dos modelos MF e LTR no modo completo. Observa-se uma descida consistente do RMSE nos modelos MF e uma estabilização da perda no LTR, indicando convergência do processo de treino.
@@ -303,7 +304,7 @@ Para complementar a análise, apresentam-se as curvas de treino dos modelos MF e
     \end{minipage}
 
     \vspace{0.2cm}
-    \begin{minipage}{0.62\textwidth}
+    \begin{minipage}{0.48\textwidth}
         \centering
         \includegraphics[width=\textwidth]{images/pairwise_ltr_training_loss.png}
     \end{minipage}
@@ -317,11 +318,11 @@ Para complementar a análise, apresentam-se as curvas de treino dos modelos MF e
 
 \section{Testes adicionais}
 
-De acordo com o enunciado do projeto (E3), foram considerados estudos com testes adicionais com o objetivo de perceber o contributo de componentes específicas do pipeline, nomeadamente o mecanismo de reranking com MMR e a utilização da feature de popularidade no modelo \textit{pairwise learning-to-rank}.
+De acordo com o enunciado do projeto (E3), foram considerados estudos com testes adicionais com o objetivo de perceber o contributo de componentes específicas da pipeline, nomeadamente o mecanismo de reranking com MMR e a utilização da feature de popularidade no modelo \textit{pairwise learning-to-rank}.
 
 \subsection{Remoção do MMR}
 
-Comparamos o desempenho dos modelos sem reranking e com MMR para dois níveis de \(\alpha\). O padrão é claro: o MMR aumenta substancialmente a diversidade, mas reduz a relevância (Recall@10 e NDCG@10), especialmente para \(\alpha=0.7\).
+Comparamos o desempenho dos modelos sem reranking e com MMR para três níveis de \(\alpha\) (0.1, 0.4 e 0.7). O padrão é claro: o MMR aumenta substancialmente a diversidade, mas reduz a relevância (Recall@10 e NDCG@10), especialmente para \(\alpha=0.7\).
 
 \begin{table}[H]
 \centering
@@ -332,10 +333,17 @@ Comparamos o desempenho dos modelos sem reranking e com MMR para dois níveis de
 \textbf{Modelo} & \textbf{Configuração} & \textbf{Recall@10} & \textbf{NDCG@10} & \textbf{Diversity@10} \\
 \midrule
 MF-SGD & Sem MMR & 0.0506 & 0.0805 & 0.7338 \\
+MF-SGD & MMR (\(\alpha=0.1\)) & 0.0492 & 0.0790 & 0.7957 \\
 MF-SGD & MMR (\(\alpha=0.4\)) & 0.0444 & 0.0718 & 0.9304 \\
 MF-SGD & MMR (\(\alpha=0.7\)) & 0.0295 & 0.0579 & 0.9909 \\
 \midrule
+MF-ALS & Sem MMR & 0.0196 & 0.0297 & 0.7086 \\
+MF-ALS & MMR (\(\alpha=0.1\)) & 0.0120 & 0.0230 & 0.9751 \\
+MF-ALS & MMR (\(\alpha=0.4\)) & 0.0120 & 0.0230 & 0.9832 \\
+MF-ALS & MMR (\(\alpha=0.7\)) & 0.0123 & 0.0234 & 0.9916 \\
+\midrule
 Pairwise LTR & Sem MMR & 0.0314 & 0.0470 & 0.7511 \\
+Pairwise LTR & MMR (\(\alpha=0.1\)) & 0.0302 & 0.0459 & 0.8066 \\
 Pairwise LTR & MMR (\(\alpha=0.4\)) & 0.0281 & 0.0424 & 0.9459 \\
 Pairwise LTR & MMR (\(\alpha=0.7\)) & 0.0191 & 0.0350 & 0.9949 \\
 \bottomrule
@@ -343,6 +351,9 @@ Pairwise LTR & MMR (\(\alpha=0.7\)) & 0.0191 & 0.0350 & 0.9949 \\
 \caption{Impacto do MMR nas métricas de ranking e diversidade.}
 \label{tab:ablation_mmr}
 \end{table}
+
+Em termos práticos, \(\alpha=0.4\) tende a ser um \textit{sweet spot}, pois aumenta bastante a diversidade sem degradar demasiado a relevância.
+
 
 \subsection{Remoção da feature de popularidade no Pairwise LTR}
 
@@ -373,22 +384,22 @@ Sem popularidade & 0.0520 & 0.0857 & 0.7219 \\
 
 
 
-
 \section{Conclusão}
-Este trabalho implementou um pipeline completo de 	extit{co-creative curation} e permitiu comparar baselines simples com modelos mais avançados, avaliando simultaneamente relevância, diversidade e adaptação temporal. Os resultados mostram que a popularidade continua a ser um sinal forte neste dataset, que o reranking por MMR melhora claramente a diversidade com um custo controlável em relevância, e que o EMA introduz uma dinâmica coerente de atualização do perfil do utilizador. As ablações confirmam ainda que o desempenho do 	extit{pairwise LTR} é sensível às features usadas, reforçando a importância de alinhar a representação e o objetivo de treino com a tarefa de ranking.
+Este trabalho implementou uma pipeline completa de \textit{co-creative curation} e permitiu comparar baselines simples com modelos mais avançados, avaliando simultaneamente a relevância, a diversidade e a adaptação temporal. Os resultados mostram que a popularidade continua a ser um sinal forte neste dataset, que o reranking por MMR melhora claramente a diversidade com um custo controlável em relevância, e que o EMA introduz uma dinâmica coerente de atualização do perfil do utilizador. Os testes adicionais confirmam ainda que o desempenho do \textit{pairwise LTR} é sensível às features usadas, reforçando a importância de alinhar a representação e o objetivo de treino com a tarefa de ranking.
 
-Quanto à escala das métricas, valores de Recall@10 e NDCG@10 baixos são esperados neste cenário: o catálogo é grande, o corte é restrito a $K=10$ e a relevância é definida por um limiar de rating, o que aumenta o número de itens relevantes por utilizador e comprime as métricas. Assim, apesar de estarem em $[0,1]$, os valores absolutos não são diretamente comparáveis a outros contextos. O desempenho particularmente baixo do MF-ALS é plausível por estar otimizado para erro quadrático em ratings (não para ranking) e por ser sensível a hiperparâmetros e regularização; com as configurações usadas, pode subajustar e produzir ordenações menos discriminativas do que o MF-SGD. No conjunto, o projeto evidencia o compromisso clássico entre precisão e variedade e sublinha que a qualidade final depende tanto do ranker base como das etapas de reranking e personalização.
+Quanto à escala das métricas, valores de Recall@10 e NDCG@10 baixos são esperados neste cenário: o catálogo é grande, o corte é restrito a $K=10$ e a relevância é definida por um limiar de rating, o que aumenta o número de itens relevantes por utilizador e comprime as métricas. Assim, apesar de estarem em $[0,1]$, os valores absolutos não são diretamente comparáveis a outros contextos. O desempenho particularmente baixo do MF-ALS é plausível por estar otimizado para erro quadrático em ratings (não para ranking) e por ser sensível a hiperparâmetros e regularização; com as configurações usadas, pode subajustar e produzir ordenações menos discriminativas do que o MF-SGD. Em suma, o projeto evidencia o compromisso clássico entre precisão e variedade e sublinha que a qualidade final depende tanto do ranker base como das etapas de reranking e personalização.
+
+
+\newpage
+
+% ======================================================
+% APÊNDICE TEÓRICO (OBRIGATÓRIO T1-T5)
+% ======================================================
+\appendix
+\section{Apêndice Teórico: Respostas T1-T5}
+
+
+\input{appendix}
 
 \end{document}
-
-% \newpage
-
-% % ======================================================
-% % APÊNDICE TEÓRICO (OBRIGATÓRIO T1-T5)
-% % ======================================================
-% \appendix
-% \section{Apêndice Teórico: Respostas T1-T5}
-
-
-% \input{appendix}
 
