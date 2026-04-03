@@ -37,7 +37,7 @@ class Config:
     TOP_M: int = None
     MMR_ALPHA_VALUES: list[float] = [0.1, 0.4, 0.7]
     MMR_NORMALIZE_REL: bool = True
-    METHODS_TO_APPLY_MMR: list[str] = ["mf_sgd", "mf_als", "pairwise_ltr"]  # or just a subset
+    METHODS_TO_APPLY_MMR: list[str] = [] #["mf_sgd", "mf_als", "pairwise_ltr"]  # or just a subset
 
     EMA_MF_METHODS: list[str] = ["mf_sgd", "mf_als"]  # or just a subset
     EMA_RHO: float = 0.1
